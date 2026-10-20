@@ -4,9 +4,12 @@
  * and the educational A* Algorithm Inspector drawer.
  */
 export class HUD {
-  constructor(container, callbacks) {
+  constructor(container, callbacks, input = null, audio = null) {
     this.container = container;
     this.callbacks = callbacks || {};
+    this.input = input;
+    this.audio = audio;
+    this.dualJoysticksInitialized = false;
 
     this.minimapCanvas = null;
     this.minimapCtx = null;
@@ -14,6 +17,9 @@ export class HUD {
 
     this._buildUI();
     this._bindEvents();
+    if (this.input) {
+      this._initDualJoysticks(this.input);
+    }
   }
 
   _buildUI() {
@@ -45,6 +51,9 @@ export class HUD {
           <button id="btn-sound" class="hud-btn" title="Toggle Audio (M)">
             <span class="icon">🔊</span> <span id="lbl-sound">SOUND ON</span>
           </button>
+          <button id="btn-call-taxi" class="hud-btn hud-btn-gold" title="Summon Taxi in front of you (Key T)">
+            <span class="icon">🚖</span> CALL TAXI
+          </button>
           <button id="btn-reset" class="hud-btn hud-btn-warning" title="Reset Car (R)">
             <span class="icon">🔄</span> RESET
           </button>
@@ -56,6 +65,53 @@ export class HUD {
           </button>
         </div>
       </header>
+
+      <!-- GTA TOP-RIGHT CASH COUNTER -->
+      <div id="gta-money-panel" class="gta-money-panel">
+        <div class="gta-cash-label">TOTAL EARNED CASH</div>
+        <div class="gta-money-row">
+          <span class="gta-currency">$</span>
+          <span id="gta-cash-val">150.00</span>
+        </div>
+        <div id="gta-cash-diff" class="gta-cash-diff hidden">+$50.00</div>
+      </div>
+
+      <!-- PLAYER VITALS CARD (HP & STAMINA) -->
+      <div id="player-vitals-card" class="player-vitals-card">
+        <div class="vitals-mode-badge driving" id="vitals-mode-badge">🚖 DRIVING CAB</div>
+        <div class="vitals-bar-row">
+          <span class="vitals-lbl">HP</span>
+          <div class="vitals-track">
+            <div id="vitals-health-fill" class="vitals-fill health-fill" style="width: 100%;"></div>
+          </div>
+          <span id="vitals-health-val" class="vitals-num">100</span>
+        </div>
+        <div class="vitals-bar-row">
+          <span class="vitals-lbl">STA</span>
+          <div class="vitals-track">
+            <div id="vitals-stamina-fill" class="vitals-fill stamina-fill" style="width: 100%;"></div>
+          </div>
+          <span id="vitals-stamina-val" class="vitals-num">100</span>
+        </div>
+      </div>
+
+      <!-- GTA INTERACTION PROMPT -->
+      <div id="interaction-prompt" class="interaction-prompt hidden">
+        <span class="prompt-key" id="prompt-key">E</span>
+        <span class="prompt-text" id="prompt-text">INTERACT</span>
+      </div>
+
+      <!-- GTA NPC DIALOGUE BOX -->
+      <div id="npc-dialogue-box" class="npc-dialogue-box hidden">
+        <div class="npc-diag-avatar" id="npc-diag-avatar">🚶</div>
+        <div class="npc-diag-content">
+          <div class="npc-diag-header">
+            <span class="npc-diag-name" id="npc-diag-name">Citizen</span>
+            <span class="npc-diag-tag">METROPOLIS NPC</span>
+          </div>
+          <div class="npc-diag-text" id="npc-diag-text">"Hey driver! Beautiful day for a ride around Metropolis!"</div>
+        </div>
+      </div>
 
       <!-- FLOATING PENALTY TOAST -->
       <div id="penalty-toast" class="penalty-toast hidden">
@@ -121,6 +177,47 @@ export class HUD {
         </div>
       </div>
 
+      <!-- CINEMATIC "WELCOME TO MAYEKARBRO CITY" TITLE CARD SCREEN -->
+      <div id="welcome-city-screen" class="welcome-city-screen hidden">
+        <div class="welcome-backdrop-grid"></div>
+        <div class="welcome-card">
+          <div class="welcome-header-badge">
+            <span class="wcb-star">★</span>
+            <span>METROPOLIS TRANSIT &amp; TAXI COMMISSION</span>
+            <span class="wcb-star">★</span>
+          </div>
+
+          <div class="welcome-hero-text">
+            <div class="welcome-sub-greeting">WELCOME TO</div>
+            <h1 class="welcome-title">
+              <span class="wt-line wt-mayekarbro">MAYEKARBRO</span>
+              <span class="wt-line wt-city">CITY</span>
+            </h1>
+          </div>
+
+          <div class="welcome-divider">
+            <span class="wd-line"></span>
+            <span class="wd-symbol" id="welcome-mascot-icon">⚡</span>
+            <span class="wd-line"></span>
+          </div>
+
+          <div class="welcome-driver-callout">
+            <div class="wdc-badge-pill">
+              <span class="wdc-label">AUTHORIZED OPERATOR:</span>
+              <span class="wdc-name" id="welcome-driver-name">ACE DRIVER</span>
+            </div>
+            <div class="wdc-meta" id="welcome-driver-meta">LICENSED CAB OPERATOR • VEHICLE READY</div>
+          </div>
+
+          <!-- DYNAMIC PROGRESS LAUNCH BAR -->
+          <div class="welcome-loader-track">
+            <div id="welcome-loader-fill" class="welcome-loader-fill"></div>
+          </div>
+
+          <div class="welcome-skip-hint">CLICK ANYWHERE OR PRESS [SPACE] TO LAUNCH ➔</div>
+        </div>
+      </div>
+
       <!-- MISSION CARD (TOP LEFT) -->
       <aside id="mission-card" class="hud-card mission-card">
         <div class="mission-header">
@@ -164,8 +261,58 @@ export class HUD {
         </div>
       </div>
 
+      <!-- TAXI RADIO & MUSIC VOLUME ADJUST BAR (LEFT SIDE) -->
+      <aside id="taxi-radio-panel" class="taxi-radio-panel">
+        <div class="radio-header">
+          <div class="radio-title-row">
+            <span class="radio-icon">📻</span>
+            <div class="radio-title-col">
+              <span class="radio-tag">TAXI FM RADIO</span>
+              <span id="radio-station-name" class="radio-station">88.5 NEON SYNTH</span>
+            </div>
+          </div>
+          <!-- ANIMATED EQUALIZER BARS -->
+          <div class="radio-eq" id="radio-eq">
+            <span class="eq-bar eq-1"></span>
+            <span class="eq-bar eq-2"></span>
+            <span class="eq-bar eq-3"></span>
+            <span class="eq-bar eq-4"></span>
+          </div>
+        </div>
+
+        <div class="radio-track-row">
+          <span class="track-status playing" id="radio-track-status">▶ PLAYING</span>
+          <span class="track-title" id="radio-track-title">Midnight Highway</span>
+        </div>
+
+        <!-- VERTICAL VOLUME SLIDER BAR -->
+        <div class="radio-vol-section">
+          <button type="button" id="btn-radio-vol-up" class="radio-vol-step-btn" title="Volume Up">+</button>
+          
+          <div class="radio-slider-container">
+            <div class="radio-track-visual">
+              <div id="radio-vol-fill" class="radio-vol-fill" style="height: 65%;"></div>
+            </div>
+            <input type="range" id="radio-vol-slider" class="radio-range-vertical" min="0" max="100" value="65" orient="vertical" title="Music Volume" />
+          </div>
+
+          <button type="button" id="btn-radio-vol-down" class="radio-vol-step-btn" title="Volume Down">-</button>
+          <div class="radio-vol-badge">
+            <span class="radio-vol-label">VOL</span>
+            <span id="radio-vol-num" class="radio-vol-val">65%</span>
+          </div>
+        </div>
+
+        <!-- RADIO CONTROLS FOOTER -->
+        <div class="radio-footer-controls">
+          <button type="button" id="btn-radio-prev" class="radio-ctrl-btn" title="Previous Station (⏮)">⏮</button>
+          <button type="button" id="btn-radio-mute" class="radio-ctrl-btn" title="Mute/Unmute Radio">🔊</button>
+          <button type="button" id="btn-radio-next" class="radio-ctrl-btn" title="Next Station (⏭)">⏭</button>
+        </div>
+      </aside>
+
       <!-- SPEEDOMETER & TAXI METER (BOTTOM LEFT) -->
-      <div class="hud-bottom-left">
+      <div class="hud-bottom-left" id="driving-dashboard">
         <!-- TAXI FARE METER -->
         <div class="hud-card taxi-meter">
           <div class="meter-row">
@@ -208,6 +355,32 @@ export class HUD {
           <div class="nitro-track">
             <div id="nitro-fill" class="nitro-fill" style="width: 100%;"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- ON-FOOT QUICK ACTION DOCK (GTA STYLE - NO BULKY JOYSTICK OVERLAYS) -->
+      <div id="onfoot-overlay" class="onfoot-overlay hidden">
+        <div class="onfoot-actions-dock" id="onfoot-actions-dock">
+          <button type="button" id="btn-onfoot-sprint" class="onfoot-action-btn btn-sprint" title="Sprint (Shift / L-Stick)">
+            <span class="oab-icon">⚡</span>
+            <span class="oab-lbl">SPRINT</span>
+          </button>
+          <button type="button" id="btn-onfoot-jump" class="onfoot-action-btn btn-jump" title="Jump (Space)">
+            <span class="oab-icon">⬆️</span>
+            <span class="oab-lbl">JUMP</span>
+          </button>
+          <button type="button" id="btn-onfoot-call-taxi" class="onfoot-action-btn btn-call-taxi" title="Summon Taxi in front of you (Key T)">
+            <span class="oab-icon">📡</span>
+            <span class="oab-lbl">CALL TAXI</span>
+          </button>
+          <button type="button" id="btn-onfoot-interact" class="onfoot-action-btn btn-interact" title="Interact (E)">
+            <span class="oab-icon">💬</span>
+            <span class="oab-lbl" id="lbl-onfoot-interact">INTERACT</span>
+          </button>
+          <button type="button" id="btn-onfoot-car" class="onfoot-action-btn btn-car" title="Enter Taxi (F)">
+            <span class="oab-icon">🚖</span>
+            <span class="oab-lbl">ENTER CAB</span>
+          </button>
         </div>
       </div>
 
@@ -341,6 +514,18 @@ export class HUD {
       }
     });
 
+    // Call Taxi top button
+    const btnCallTaxi = document.getElementById('btn-call-taxi');
+    if (btnCallTaxi) {
+      btnCallTaxi.addEventListener('click', () => {
+        if (this.callbacks.onCallTaxi) {
+          this.callbacks.onCallTaxi();
+        } else if (this.input) {
+          this.input.triggerAction('callTaxi');
+        }
+      });
+    }
+
     // Reset button
     document.getElementById('btn-reset').addEventListener('click', () => {
       if (this.callbacks.onResetCar) this.callbacks.onResetCar();
@@ -372,6 +557,64 @@ export class HUD {
       document.getElementById('modal-celebration').classList.add('hidden');
       if (this.callbacks.onNextMission) this.callbacks.onNextMission();
     });
+
+    // Taxi Radio & Volume Slider Events
+    const volSlider = document.getElementById('radio-vol-slider');
+    if (volSlider) {
+      volSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) / 100;
+        if (this.callbacks.onSetMusicVolume) this.callbacks.onSetMusicVolume(val);
+        else if (this.audio) this.audio.setMusicVolume(val);
+      });
+    }
+
+    const btnVolUp = document.getElementById('btn-radio-vol-up');
+    if (btnVolUp) {
+      btnVolUp.addEventListener('click', () => {
+        if (!this.audio) return;
+        const current = this.audio.getMusicVolume ? this.audio.getMusicVolume() : 0.65;
+        const next = Math.min(1.0, current + 0.05);
+        if (this.callbacks.onSetMusicVolume) this.callbacks.onSetMusicVolume(next);
+        else this.audio.setMusicVolume(next);
+        if (volSlider) volSlider.value = Math.round(next * 100);
+      });
+    }
+
+    const btnVolDown = document.getElementById('btn-radio-vol-down');
+    if (btnVolDown) {
+      btnVolDown.addEventListener('click', () => {
+        if (!this.audio) return;
+        const current = this.audio.getMusicVolume ? this.audio.getMusicVolume() : 0.65;
+        const next = Math.max(0.0, current - 0.05);
+        if (this.callbacks.onSetMusicVolume) this.callbacks.onSetMusicVolume(next);
+        else this.audio.setMusicVolume(next);
+        if (volSlider) volSlider.value = Math.round(next * 100);
+      });
+    }
+
+    const btnNextStation = document.getElementById('btn-radio-next');
+    if (btnNextStation) {
+      btnNextStation.addEventListener('click', () => {
+        if (this.callbacks.onNextRadioStation) this.callbacks.onNextRadioStation();
+        else if (this.audio) this.audio.nextRadioStation();
+      });
+    }
+
+    const btnPrevStation = document.getElementById('btn-radio-prev');
+    if (btnPrevStation) {
+      btnPrevStation.addEventListener('click', () => {
+        if (this.callbacks.onPrevRadioStation) this.callbacks.onPrevRadioStation();
+        else if (this.audio) this.audio.prevRadioStation();
+      });
+    }
+
+    const btnRadioMute = document.getElementById('btn-radio-mute');
+    if (btnRadioMute) {
+      btnRadioMute.addEventListener('click', () => {
+        if (this.callbacks.onToggleMusicMute) this.callbacks.onToggleMusicMute();
+        else if (this.audio) this.audio.toggleMusicMute();
+      });
+    }
 
     // Driver Registration Form State
     let selectedColor = '#ffb703';
@@ -423,8 +666,14 @@ export class HUD {
       });
     });
 
-    // Start Driving Button
+    // Start Driving Button -> Cinematic Welcome Title Screen Transition
     const startBtn = document.getElementById('btn-start-game');
+    const welcomeScreenEl = document.getElementById('welcome-city-screen');
+    const welcomeNameEl = document.getElementById('welcome-driver-name');
+    const welcomeMetaEl = document.getElementById('welcome-driver-meta');
+    const welcomeIconEl = document.getElementById('welcome-mascot-icon');
+    const welcomeFillEl = document.getElementById('welcome-loader-fill');
+
     if (startBtn) {
       startBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -440,17 +689,80 @@ export class HUD {
         document.getElementById('dl-color-dot').style.background = selectedColor;
         document.getElementById('brand-mascot').innerText = `${selectedSymbol} TAXI`;
 
-        // Hide Modal
+        // Hide Driver Registration Modal
         if (regModalEl) regModalEl.classList.add('hidden');
 
-        // Callback to persist driver profile and apply car visuals
-        if (this.callbacks.onDriverRegistered) {
-          this.callbacks.onDriverRegistered({
-            name: nameVal,
-            age: ageVal,
-            carColor: selectedColor,
-            funSymbol: selectedSymbol
-          });
+        // Play audio feedback chime
+        if (this.audio) {
+          if (this.audio.init) this.audio.init();
+          if (this.audio.playPickupSound) this.audio.playPickupSound();
+        }
+
+        // Setup and launch the stylized "WELCOME TO MAYEKARBRO CITY" card
+        if (welcomeScreenEl) {
+          if (welcomeNameEl) welcomeNameEl.innerText = nameVal.toUpperCase();
+          if (welcomeMetaEl) welcomeMetaEl.innerText = `AGE ${ageVal} • TAXI LICENSE #099 ACTIVE • READY FOR PICKUPS`;
+          if (welcomeIconEl) welcomeIconEl.innerText = selectedSymbol;
+
+          // Reveal with smooth entrance animation
+          welcomeScreenEl.classList.remove('hidden', 'welcome-exit');
+          welcomeScreenEl.classList.add('welcome-active');
+
+          // Reset and trigger loader bar animation
+          if (welcomeFillEl) {
+            welcomeFillEl.style.animation = 'none';
+            void welcomeFillEl.offsetWidth;
+            welcomeFillEl.style.animation = 'welcomeLoaderBar 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+          }
+
+          let hasDismissed = false;
+          const dismissWelcome = () => {
+            if (hasDismissed) return;
+            hasDismissed = true;
+
+            welcomeScreenEl.classList.add('welcome-exit');
+            window.removeEventListener('keydown', onKeyDismiss);
+            welcomeScreenEl.removeEventListener('click', dismissWelcome);
+
+            setTimeout(() => {
+              welcomeScreenEl.classList.add('hidden');
+              welcomeScreenEl.classList.remove('welcome-active', 'welcome-exit');
+
+              // Callback to persist driver profile and start gameplay
+              if (this.callbacks.onDriverRegistered) {
+                this.callbacks.onDriverRegistered({
+                  name: nameVal,
+                  age: ageVal,
+                  carColor: selectedColor,
+                  funSymbol: selectedSymbol
+                });
+              }
+
+              this.showActionToast('🚖 WELCOME TO MAYEKARBRO CITY! PRESS W/↑ TO ACCELERATE');
+            }, 480);
+          };
+
+          const onKeyDismiss = (evt) => {
+            if (evt.code === 'Space' || evt.code === 'Enter') {
+              dismissWelcome();
+            }
+          };
+
+          window.addEventListener('keydown', onKeyDismiss);
+          welcomeScreenEl.addEventListener('click', dismissWelcome);
+
+          // Auto-advance after 2.6 seconds if user doesn't click
+          setTimeout(dismissWelcome, 2600);
+        } else {
+          // Fallback if welcome screen element is not present
+          if (this.callbacks.onDriverRegistered) {
+            this.callbacks.onDriverRegistered({
+              name: nameVal,
+              age: ageVal,
+              carColor: selectedColor,
+              funSymbol: selectedSymbol
+            });
+          }
         }
       });
     }
@@ -466,6 +778,171 @@ export class HUD {
           regModalEl.classList.remove('hidden');
           if (nameInputEl) nameInputEl.focus();
         }
+      });
+    }
+  }
+
+  /**
+   * Initializes Left and Right Virtual Joysticks & action buttons for on-foot player controls.
+   * - Left Joystick: 360-degree analog movement
+   * - Right Joystick: 360-degree analog camera panning & tilt
+   * - Action Buttons: Sprint (hold/toggle), Jump, Interact, Enter/Exit Cab
+   * @param {import('../core/InputManager.js').InputManager} input
+   */
+  _initDualJoysticks(input) {
+    if (!input || this.dualJoysticksInitialized) return;
+    this.dualJoysticksInitialized = true;
+
+    const setupJoystick = (baseEl, knobEl, onMove, onRelease) => {
+      if (!baseEl || !knobEl) return;
+      let activePointerId = null;
+      let startX = 0;
+      let startY = 0;
+      const maxRadius = 46; // max travel distance in pixels
+
+      const handlePointerDown = (e) => {
+        if (activePointerId !== null) return;
+        activePointerId = e.pointerId;
+        baseEl.setPointerCapture(e.pointerId);
+
+        const rect = baseEl.getBoundingClientRect();
+        startX = rect.left + rect.width / 2;
+        startY = rect.top + rect.height / 2;
+
+        handlePointerMove(e);
+      };
+
+      const handlePointerMove = (e) => {
+        if (e.pointerId !== activePointerId) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        const dist = Math.hypot(dx, dy);
+        const clampedDist = Math.min(dist, maxRadius);
+        const angle = Math.atan2(dy, dx);
+
+        const knobX = Math.cos(angle) * clampedDist;
+        const knobY = Math.sin(angle) * clampedDist;
+
+        knobEl.style.transform = `translate3d(${knobX}px, ${knobY}px, 0)`;
+
+        // Normalized outputs -1 to 1:
+        // Horizontal: right (+1), left (-1)
+        // Vertical: pushing up (+1) is negative screen Y, pushing down (-1) is positive screen Y
+        const normX = knobX / maxRadius;
+        const normY = -knobY / maxRadius;
+
+        onMove(normX, normY);
+      };
+
+      const handlePointerUp = (e) => {
+        if (e.pointerId !== activePointerId) return;
+        activePointerId = null;
+        try {
+          baseEl.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+
+        knobEl.style.transition = 'transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1)';
+        knobEl.style.transform = 'translate3d(0, 0, 0)';
+        setTimeout(() => {
+          knobEl.style.transition = '';
+        }, 180);
+
+        onRelease();
+      };
+
+      baseEl.addEventListener('pointerdown', handlePointerDown);
+      baseEl.addEventListener('pointermove', handlePointerMove);
+      baseEl.addEventListener('pointerup', handlePointerUp);
+      baseEl.addEventListener('pointercancel', handlePointerUp);
+    };
+
+    // 1. Left Joystick: Move Character (if present)
+    const leftBase = document.getElementById('joy-base-left');
+    const leftKnob = document.getElementById('joy-knob-left');
+    if (leftBase && leftKnob) {
+      setupJoystick(
+        leftBase,
+        leftKnob,
+        (x, y) => input.setLeftJoystick(x, y),
+        () => input.setLeftJoystick(0, 0)
+      );
+    }
+
+    // 2. Right Joystick: Pan Around Camera (if present)
+    const rightBase = document.getElementById('joy-base-right');
+    const rightKnob = document.getElementById('joy-knob-right');
+    if (rightBase && rightKnob) {
+      setupJoystick(
+        rightBase,
+        rightKnob,
+        (x, y) => input.setRightJoystick(x, y),
+        () => input.setRightJoystick(0, 0)
+      );
+    }
+
+    // 3. Action Buttons (Sprint, Jump, Interact, Enter Cab)
+    const btnSprint = document.getElementById('btn-onfoot-sprint');
+    const btnJump = document.getElementById('btn-onfoot-jump');
+    const btnInteract = document.getElementById('btn-onfoot-interact');
+    const btnCar = document.getElementById('btn-onfoot-car');
+
+    if (btnSprint) {
+      let isSprintToggled = false;
+      const startSprint = (e) => {
+        e.preventDefault();
+        input.setVirtualAction('sprint', true);
+        btnSprint.classList.add('active');
+      };
+      const endSprint = (e) => {
+        e.preventDefault();
+        if (!isSprintToggled) {
+          input.setVirtualAction('sprint', false);
+          btnSprint.classList.remove('active');
+        }
+      };
+      btnSprint.addEventListener('pointerdown', startSprint);
+      btnSprint.addEventListener('pointerup', endSprint);
+      btnSprint.addEventListener('pointercancel', endSprint);
+
+      btnSprint.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        isSprintToggled = !isSprintToggled;
+        input.setVirtualAction('sprint', isSprintToggled);
+        btnSprint.classList.toggle('active', isSprintToggled);
+      });
+    }
+
+    if (btnJump) {
+      btnJump.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        input.setVirtualAction('jump', true);
+        btnJump.classList.add('active');
+        setTimeout(() => {
+          input.setVirtualAction('jump', false);
+          btnJump.classList.remove('active');
+        }, 160);
+      });
+    }
+
+    if (btnInteract) {
+      btnInteract.addEventListener('click', (e) => {
+        e.preventDefault();
+        input.triggerAction('interact');
+      });
+    }
+
+    const btnCallTaxiDock = document.getElementById('btn-onfoot-call-taxi');
+    if (btnCallTaxiDock) {
+      btnCallTaxiDock.addEventListener('click', (e) => {
+        e.preventDefault();
+        input.triggerAction('callTaxi');
+      });
+    }
+
+    if (btnCar) {
+      btnCar.addEventListener('click', (e) => {
+        e.preventDefault();
+        input.triggerAction('enterExitVehicle');
       });
     }
   }
@@ -521,16 +998,20 @@ export class HUD {
    * @param {import('../core/InputManager.js').InputManager} input
    * @param {import('../city/RoadNetwork.js').RoadNetwork} roadNetwork
    * @param {import('../city/MonorailSystem.js').MonorailSystem} [monorailSys]
+   * @param {import('../gameplay/PlayerCharacter.js').PlayerCharacter} [playerCharacter]
+   * @param {import('../city/CityBuilder.js').CityBuilder} [cityBuilder]
    */
-  update(car, passengerSys, input, roadNetwork, monorailSys = null) {
+  update(car, passengerSys, input, roadNetwork, monorailSys = null, playerCharacter = null, cityBuilder = null) {
     // 1. Speedometer & Gear
     const kmh = car.getSpeedKmh();
-    document.getElementById('val-speed').innerText = kmh;
+    const speedEl = document.getElementById('val-speed');
+    if (speedEl) speedEl.innerText = kmh;
 
     // SVG Speed ring fill (Circumference = 2 * PI * 70 = ~440)
     const maxKmh = 140;
     const offset = 440 - (Math.min(kmh, maxKmh) / maxKmh) * 440;
-    document.getElementById('speed-ring-fill').style.strokeDashoffset = offset;
+    const ringEl = document.getElementById('speed-ring-fill');
+    if (ringEl) ringEl.style.strokeDashoffset = offset;
 
     const gear = car.getGear();
     ['p', 'r', 'n', 'd'].forEach(g => {
@@ -550,17 +1031,167 @@ export class HUD {
 
     // Drift badge
     const driftBadge = document.getElementById('drift-badge');
-    if (car.isDrifting && car.driftScore > 10) {
-      driftBadge.classList.remove('hidden');
-      document.getElementById('val-drift').innerText = car.driftScore;
-    } else {
-      driftBadge.classList.add('hidden');
+    if (driftBadge) {
+      if (car.isDrifting && car.driftScore > 10) {
+        driftBadge.classList.remove('hidden');
+        document.getElementById('val-drift').innerText = car.driftScore;
+      } else {
+        driftBadge.classList.add('hidden');
+      }
     }
 
     // 2. Mission & Passenger Details
-    const telemetry = passengerSys.getTelemetry(car.position);
-    document.getElementById('val-total-cash').innerText = `$${telemetry.totalEarnings.toFixed(2)}`;
-    document.getElementById('val-trips').innerText = telemetry.completedTrips;
+    const telemetry = passengerSys.getTelemetry(playerCharacter && playerCharacter.isActive ? playerCharacter.position : car.position);
+    const meterCashEl = document.getElementById('val-total-cash');
+    if (meterCashEl) meterCashEl.innerText = `$${telemetry.totalEarnings.toFixed(2)}`;
+    const tripsEl = document.getElementById('val-trips');
+    if (tripsEl) tripsEl.innerText = telemetry.completedTrips;
+
+    // ---------------------------------------------------------
+    // TOP-RIGHT GTA CASH COUNTER WITH ANIMATED DIFF
+    // ---------------------------------------------------------
+    const gtaCashEl = document.getElementById('gta-cash-val');
+    const gtaDiffEl = document.getElementById('gta-cash-diff');
+    if (gtaCashEl) {
+      const currentCash = telemetry.totalEarnings;
+      gtaCashEl.innerText = currentCash.toFixed(2);
+
+      if (this.lastCash !== undefined && Math.abs(currentCash - this.lastCash) > 0.01) {
+        const diff = currentCash - this.lastCash;
+        if (gtaDiffEl) {
+          gtaDiffEl.innerText = diff > 0 ? `+$${diff.toFixed(2)}` : `-$${Math.abs(diff).toFixed(2)}`;
+          gtaDiffEl.className = diff > 0 ? 'gta-cash-diff text-green' : 'gta-cash-diff text-red';
+          gtaDiffEl.classList.remove('hidden');
+
+          clearTimeout(this.cashDiffTimeout);
+          this.cashDiffTimeout = setTimeout(() => {
+            if (gtaDiffEl) gtaDiffEl.classList.add('hidden');
+          }, 2200);
+        }
+      }
+      this.lastCash = currentCash;
+    }
+
+    // ---------------------------------------------------------
+    // PLAYER CHARACTER VITALS & DRIVING/ON-FOOT MODE
+    // ---------------------------------------------------------
+    if (playerCharacter) {
+      const hpFill = document.getElementById('vitals-health-fill');
+      const hpVal = document.getElementById('vitals-health-val');
+      const staFill = document.getElementById('vitals-stamina-fill');
+      const staVal = document.getElementById('vitals-stamina-val');
+      const modeBadge = document.getElementById('vitals-mode-badge');
+
+      const hpPct = Math.max(0, Math.min(100, Math.round((playerCharacter.health / playerCharacter.maxHealth) * 100)));
+      const staPct = Math.max(0, Math.min(100, Math.round((playerCharacter.stamina / playerCharacter.maxStamina) * 100)));
+
+      if (hpFill) hpFill.style.width = `${hpPct}%`;
+      if (hpVal) hpVal.innerText = hpPct;
+      if (staFill) staFill.style.width = `${staPct}%`;
+      if (staVal) staVal.innerText = staPct;
+
+      if (modeBadge) {
+        if (playerCharacter.isActive) {
+          modeBadge.innerText = '🚶 ON FOOT • WASD TO MOVE • MOUSE TO PAN (T: CALL TAXI)';
+          modeBadge.className = 'vitals-mode-badge on-foot';
+        } else {
+          modeBadge.innerText = '🚖 DRIVING CAB (EXIT: F)';
+          modeBadge.className = 'vitals-mode-badge driving';
+        }
+      }
+
+      // Toggle On-Foot Actions Overlay vs Driving Dashboard
+      const onFootOverlay = document.getElementById('onfoot-overlay') || document.getElementById('dual-joystick-overlay');
+      const drivingDash = document.getElementById('driving-dashboard');
+
+      if (playerCharacter.isActive) {
+        if (onFootOverlay) onFootOverlay.classList.remove('hidden');
+        if (drivingDash) drivingDash.classList.add('hidden');
+
+        // Dynamically style action buttons according to nearby proximity
+        const btnCar = document.getElementById('btn-onfoot-car');
+        const btnInteract = document.getElementById('btn-onfoot-interact');
+        const lblInteract = document.getElementById('lbl-onfoot-interact');
+
+        if (playerCharacter.nearbyInteractable) {
+          const it = playerCharacter.nearbyInteractable;
+          if (it.type === 'CAR') {
+            if (btnCar) btnCar.classList.add('pulse-glow');
+            if (btnInteract) btnInteract.classList.remove('pulse-glow');
+          } else {
+            if (btnCar) btnCar.classList.remove('pulse-glow');
+            if (btnInteract) {
+              btnInteract.classList.add('pulse-glow');
+              if (lblInteract) {
+                lblInteract.innerText = it.type === 'FOOD_STALL' ? 'BUY FOOD' : (it.type === 'BED' ? 'REST BED' : 'TALK');
+              }
+            }
+          }
+        } else {
+          if (btnCar) btnCar.classList.remove('pulse-glow');
+          if (btnInteract) {
+            btnInteract.classList.remove('pulse-glow');
+            if (lblInteract) lblInteract.innerText = 'INTERACT';
+          }
+        }
+      } else {
+        if (onFootOverlay) onFootOverlay.classList.add('hidden');
+        if (drivingDash) drivingDash.classList.remove('hidden');
+      }
+
+      // ---------------------------------------------------------
+      // TAXI RADIO & MUSIC VOLUME ADJUST BAR UPDATE
+      // ---------------------------------------------------------
+      if (this.audio) {
+        const stationEl = document.getElementById('radio-station-name');
+        const trackEl = document.getElementById('radio-track-title');
+        const statusEl = document.getElementById('radio-track-status');
+        const eqEl = document.getElementById('radio-eq');
+        const volNumEl = document.getElementById('radio-vol-num');
+        const volFillEl = document.getElementById('radio-vol-fill');
+        const muteBtn = document.getElementById('btn-radio-mute');
+
+        const st = this.audio.getCurrentStation ? this.audio.getCurrentStation() : null;
+        if (st && stationEl) stationEl.innerText = st.name;
+        if (st && trackEl) trackEl.innerText = st.track;
+
+        const isPlaying = !playerCharacter.isActive && !this.audio.isMusicMuted && !this.audio.isMuted;
+        if (statusEl) {
+          statusEl.innerText = playerCharacter.isActive ? '⏸ OUTSIDE TAXI' : (this.audio.isMusicMuted ? '🔇 MUTED' : '▶ PLAYING');
+          statusEl.className = isPlaying ? 'track-status playing' : 'track-status paused';
+        }
+        if (eqEl) {
+          if (isPlaying) eqEl.classList.remove('paused');
+          else eqEl.classList.add('paused');
+        }
+
+        const volPct = Math.round((this.audio.getMusicVolume ? this.audio.getMusicVolume() : 0.65) * 100);
+        if (volNumEl) volNumEl.innerText = `${volPct}%`;
+        if (volFillEl) volFillEl.style.height = `${volPct}%`;
+        if (muteBtn) {
+          muteBtn.innerText = (this.audio.isMusicMuted || this.audio.isMuted) ? '🔇' : '🔊';
+        }
+      }
+
+      // Interaction Prompt
+      const promptEl = document.getElementById('interaction-prompt');
+      const promptKey = document.getElementById('prompt-key');
+      const promptText = document.getElementById('prompt-text');
+
+      if (promptEl && promptKey && promptText) {
+        if (playerCharacter.nearbyInteractable) {
+          promptKey.innerText = playerCharacter.nearbyInteractable.key || 'E';
+          promptText.innerText = playerCharacter.nearbyInteractable.prompt;
+          promptEl.classList.remove('hidden');
+        } else if (!playerCharacter.isActive && kmh < 12) {
+          promptKey.innerText = 'F';
+          promptText.innerText = 'EXIT TAXI & EXPLORE CITY';
+          promptEl.classList.remove('hidden');
+        } else {
+          promptEl.classList.add('hidden');
+        }
+      }
+    }
 
     // VIP Role tag & comfort meter
     const vipTag = document.getElementById('vip-role-tag');
@@ -594,45 +1225,56 @@ export class HUD {
     const dialogueEl = document.getElementById('passenger-dialogue');
 
     if (telemetry.passenger) {
-      nameEl.innerText = telemetry.passenger.name;
-      avatar.src = telemetry.passenger.avatar;
+      if (nameEl) nameEl.innerText = telemetry.passenger.name;
+      if (avatar) avatar.src = telemetry.passenger.avatar;
 
-      if (telemetry.state === 'PICKUP') {
-        missionBadge.className = 'badge badge-pickup';
-        missionBadge.innerText = 'PICKUP PASSENGER';
-        destName.innerText = telemetry.pickupNode ? telemetry.pickupNode.name : 'Pickup Point';
-        dialogueEl.innerText = `"${telemetry.passenger.dialoguePickup}"`;
-      } else if (telemetry.state === 'IN_TRANSIT') {
-        missionBadge.className = 'badge badge-transit';
-        missionBadge.innerText = 'IN TRANSIT';
-        destName.innerText = telemetry.destinationNode ? telemetry.destinationNode.name : 'Destination';
-        dialogueEl.innerText = `Heading to ${destName.innerText}!`;
+      if (missionBadge && destName && dialogueEl) {
+        if (telemetry.state === 'PICKUP') {
+          missionBadge.className = 'badge badge-pickup';
+          missionBadge.innerText = 'PICKUP PASSENGER';
+          destName.innerText = telemetry.pickupNode ? telemetry.pickupNode.name : 'Pickup Point';
+          dialogueEl.innerText = `"${telemetry.passenger.dialoguePickup}"`;
+        } else if (telemetry.state === 'IN_TRANSIT') {
+          missionBadge.className = 'badge badge-transit';
+          missionBadge.innerText = 'IN TRANSIT';
+          destName.innerText = telemetry.destinationNode ? telemetry.destinationNode.name : 'Destination';
+          dialogueEl.innerText = `Heading to ${destName.innerText}!`;
+        }
       }
     }
 
-    document.getElementById('lbl-distance').innerText = `${telemetry.remainingDistance} m`;
+    const distEl = document.getElementById('lbl-distance');
+    if (distEl) distEl.innerText = `${telemetry.remainingDistance} m`;
 
     // Mission timer
-    const mins = Math.floor(telemetry.tripTimeElapsed / 60).toString().padStart(2, '0');
-    const secs = (telemetry.tripTimeElapsed % 60).toString().padStart(2, '0');
-    document.getElementById('mission-timer').innerText = `${mins}:${secs}`;
+    const timerEl = document.getElementById('mission-timer');
+    if (timerEl) {
+      const mins = Math.floor(telemetry.tripTimeElapsed / 60).toString().padStart(2, '0');
+      const secs = (telemetry.tripTimeElapsed % 60).toString().padStart(2, '0');
+      timerEl.innerText = `${mins}:${secs}`;
+    }
 
     // 3. A* Navigation Data
     const aStar = telemetry.aStarResult;
     if (aStar && aStar.found) {
-      document.getElementById('lbl-nodes-count').innerText = `${aStar.path.length} nodes`;
+      const nodesCountEl = document.getElementById('lbl-nodes-count');
+      if (nodesCountEl) nodesCountEl.innerText = `${aStar.path.length} nodes`;
 
       // Turn instructions
       if (aStar.directions && aStar.directions.length > 0) {
         const nextStep = aStar.directions[0];
-        document.getElementById('turn-instruction').innerText = nextStep.instruction;
-        document.getElementById('turn-street').innerText = `${Math.round(nextStep.distance)}m on ${nextStep.streetName}`;
+        const turnInstEl = document.getElementById('turn-instruction');
+        const turnStreetEl = document.getElementById('turn-street');
+        if (turnInstEl) turnInstEl.innerText = nextStep.instruction;
+        if (turnStreetEl) turnStreetEl.innerText = `${Math.round(nextStep.distance)}m on ${nextStep.streetName}`;
 
         const icon = document.getElementById('turn-icon');
-        if (nextStep.instruction.includes('Right')) icon.innerText = '⮡';
-        else if (nextStep.instruction.includes('Left')) icon.innerText = '⮠';
-        else if (nextStep.instruction.includes('Arrive')) icon.innerText = '🏁';
-        else icon.innerText = '⬆';
+        if (icon) {
+          if (nextStep.instruction.includes('Right')) icon.innerText = '⮡';
+          else if (nextStep.instruction.includes('Left')) icon.innerText = '⮠';
+          else if (nextStep.instruction.includes('Arrive')) icon.innerText = '🏁';
+          else icon.innerText = '⬆';
+        }
       }
 
       // Populate A* Inspector drawer
@@ -642,15 +1284,16 @@ export class HUD {
         document.getElementById('astat-dist').innerText = `${Math.round(aStar.totalDistance)} m`;
         document.getElementById('astat-waypoints').innerText = aStar.path.length;
 
-        // Steps list
         const stepsContainer = document.getElementById('astar-steps-list');
-        stepsContainer.innerHTML = aStar.directions.map((d, i) => `
-          <div class="step-item">
-            <span class="step-index">#${i + 1}</span>
-            <span class="step-text">${d.instruction}</span>
-            <span class="step-dist">${d.distance > 0 ? Math.round(d.distance) + 'm' : ''}</span>
-          </div>
-        `).join('');
+        if (stepsContainer) {
+          stepsContainer.innerHTML = aStar.directions.map((d, i) => `
+            <div class="step-item">
+              <span class="step-index">#${i + 1}</span>
+              <span class="step-text">${d.instruction}</span>
+              <span class="step-dist">${d.distance > 0 ? Math.round(d.distance) + 'm' : ''}</span>
+            </div>
+          `).join('');
+        }
       }
     }
 
@@ -661,33 +1304,57 @@ export class HUD {
     const gpSticks = document.getElementById('gp-sticks');
 
     if (gp.connected) {
-      gpDot.classList.add('online');
-      gpName.innerText = `Gamepad: ${gp.name}`;
-      gpSticks.style.display = 'flex';
+      if (gpDot) gpDot.classList.add('online');
+      if (gpName) gpName.innerText = `Gamepad: ${gp.name}`;
+      if (gpSticks) gpSticks.style.display = 'flex';
 
-      // Move left stick nub
       const nub = document.getElementById('gp-stick-l');
-      nub.style.transform = `translate(${gp.steer * 14}px, 0px)`;
+      if (nub) nub.style.transform = `translate(${gp.steer * 14}px, 0px)`;
 
-      // Update trigger bars
       const barLt = document.getElementById('gp-bar-lt');
       const barRt = document.getElementById('gp-bar-rt');
-      barLt.style.height = `${Math.max(0, -gp.throttle) * 100}%`;
-      barRt.style.height = `${Math.max(0, gp.throttle) * 100}%`;
+      if (barLt) barLt.style.height = `${Math.max(0, -gp.throttle) * 100}%`;
+      if (barRt) barRt.style.height = `${Math.max(0, gp.throttle) * 100}%`;
     } else {
-      gpDot.classList.remove('online');
-      gpName.innerText = 'Gamepad: Disconnected (Plug In to Play)';
-      gpSticks.style.display = 'none';
+      if (gpDot) gpDot.classList.remove('online');
+      if (gpName) gpName.innerText = 'Gamepad: Disconnected (Plug In to Play)';
+      if (gpSticks) gpSticks.style.display = 'none';
     }
 
-    // 5. Draw 2D Radar Minimap
-    this._renderMinimap(car, passengerSys, roadNetwork, aStar, monorailSys);
+    // 5. Draw 2D Radar Minimap with Landmarks, Food Stalls, and Player
+    this._renderMinimap(car, passengerSys, roadNetwork, aStar, monorailSys, playerCharacter, cityBuilder);
   }
 
   /**
-   * Renders the 2D real-time radar minimap canvas.
+   * Displays GTA-style dialogue box when interacting with a pedestrian citizen.
+   * @param {string} npcName
+   * @param {string} message
+   * @param {string} [avatar='🚶']
    */
-  _renderMinimap(car, passengerSys, roadNetwork, aStar, monorailSys = null) {
+  showNpcDialogue(npcName, message, avatar = '🚶') {
+    const box = document.getElementById('npc-dialogue-box');
+    if (!box) return;
+    const nameEl = document.getElementById('npc-diag-name');
+    const textEl = document.getElementById('npc-diag-text');
+    const avEl = document.getElementById('npc-diag-avatar');
+
+    if (nameEl) nameEl.innerText = npcName;
+    if (textEl) textEl.innerText = `"${message}"`;
+    if (avEl) avEl.innerText = avatar;
+
+    box.classList.remove('hidden');
+
+    clearTimeout(this.npcDialogueTimeout);
+    this.npcDialogueTimeout = setTimeout(() => {
+      box.classList.add('hidden');
+    }, 4500);
+  }
+
+  /**
+   * Renders the 2D real-time radar minimap canvas with:
+   * Basketball Court, Safehouse, Central Gardens, Hospital, Police, Fire, Google HQ, Food Stalls.
+   */
+  _renderMinimap(car, passengerSys, roadNetwork, aStar, monorailSys = null, playerCharacter = null, cityBuilder = null) {
     if (!this.minimapCtx) return;
     const ctx = this.minimapCtx;
     const w = this.minimapCanvas.width;
@@ -703,13 +1370,21 @@ export class HUD {
     const bounds = roadNetwork.getCityBounds();
     const cityW = bounds.maxX - bounds.minX;
     const cityD = bounds.maxZ - bounds.minZ;
-    const scaleX = (w - 24) / cityW;
-    const scaleZ = (h - 24) / cityD;
+    const scaleX = (w - 28) / cityW;
+    const scaleZ = (h - 28) / cityD;
 
-    const toMapX = (worldX) => 12 + (worldX - bounds.minX) * scaleX;
-    const toMapY = (worldZ) => 12 + (worldZ - bounds.minZ) * scaleZ;
+    const toMapX = (worldX) => 14 + (worldX - bounds.minX) * scaleX;
+    const toMapY = (worldZ) => 14 + (worldZ - bounds.minZ) * scaleZ;
 
-    // Draw road grid lines
+    // 1. Draw Central Park Green Lawn
+    const parkMinX = toMapX(-70);
+    const parkMinZ = toMapY(-70);
+    const parkMaxX = toMapX(70);
+    const parkMaxZ = toMapY(70);
+    ctx.fillStyle = 'rgba(21, 128, 61, 0.35)';
+    ctx.fillRect(parkMinX, parkMinZ, parkMaxX - parkMinX, parkMaxZ - parkMinZ);
+
+    // 2. Draw road grid lines
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 3;
     for (const seg of roadNetwork.roadSegments) {
@@ -719,7 +1394,7 @@ export class HUD {
       ctx.stroke();
     }
 
-    // Draw active A* Route
+    // 3. Draw active A* Route
     if (aStar && aStar.path && aStar.path.length > 1) {
       ctx.strokeStyle = passengerSys.state === 'PICKUP' ? '#10b981' : '#00f0ff';
       ctx.lineWidth = 4;
@@ -734,57 +1409,162 @@ export class HUD {
       ctx.shadowBlur = 0;
     }
 
-    // Draw Pickup Point (Green pulsing dot)
+    // 4. Draw Key City Landmarks with Badges & Icons
+    const landmarks = [
+      { name: 'Safehouse', icon: '🏠', x: -175, z: 175, color: '#f59e0b' },
+      { name: 'Basketball', icon: '🏀', x: 105, z: -105, color: '#3b82f6' },
+      { name: 'Garden', icon: '🌳', x: 0, z: 0, color: '#10b981' },
+      { name: 'Hospital', icon: '🏥', x: 175, z: 175, color: '#ef4444' },
+      { name: 'Police', icon: '🚓', x: -105, z: -175, color: '#00f0ff' },
+      { name: 'Fire Dept', icon: '🚒', x: -175, z: -105, color: '#f97316' },
+      { name: 'Google HQ', icon: '🌐', x: 105, z: 105, color: '#4285F4' },
+      { name: 'Residential', icon: '🏡', x: -105, z: 245, color: '#a855f7' }
+    ];
+
+    for (const lm of landmarks) {
+      const lx = toMapX(lm.x);
+      const ly = toMapY(lm.z);
+
+      // Glowing pin badge background
+      ctx.fillStyle = lm.color;
+      ctx.shadowColor = lm.color;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(lx, ly, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Icon emoji label
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(lm.icon, lx, ly);
+
+      // Landmark label above icon
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.fillText(lm.name, lx, ly - 9);
+    }
+
+    // 5. Draw Street Food Stalls
+    if (cityBuilder && cityBuilder.foodStalls) {
+      ctx.fillStyle = '#f59e0b';
+      for (const stall of cityBuilder.foodStalls) {
+        const sx = toMapX(stall.x);
+        const sy = toMapY(stall.z);
+
+        ctx.beginPath();
+        ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = '8px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(stall.icon || '🌭', sx, sy - 5);
+      }
+    }
+
+    // 6. Draw Pickup Point (Green pulsing circle)
     if (passengerSys.pickupNode && passengerSys.state === 'PICKUP') {
       const px = toMapX(passengerSys.pickupNode.x);
       const py = toMapY(passengerSys.pickupNode.z);
       ctx.fillStyle = '#10b981';
       ctx.beginPath();
-      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.arc(px, py, 7, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
 
-    // Draw Destination Point (Cyan pulsing dot)
+    // 7. Draw Destination Point (Cyan pulsing circle)
     if (passengerSys.destinationNode && passengerSys.state === 'IN_TRANSIT') {
       const dx = toMapX(passengerSys.destinationNode.x);
       const dy = toMapY(passengerSys.destinationNode.z);
       ctx.fillStyle = '#00f0ff';
       ctx.beginPath();
-      ctx.arc(dx, dy, 7, 0, Math.PI * 2);
+      ctx.arc(dx, dy, 8, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
 
-    // Draw Elevated Monorail Train (Sleek violet/purple dot)
+    // 8. Draw Elevated Monorail Train (Violet dot)
     if (monorailSys && monorailSys.trainMesh) {
       const mx = toMapX(monorailSys.trainMesh.position.x);
       const my = toMapY(monorailSys.trainMesh.position.z);
       ctx.fillStyle = '#c084fc';
       ctx.beginPath();
-      ctx.arc(mx, my, 4, 0, Math.PI * 2);
+      ctx.arc(mx, my, 4.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Draw Player Taxi (Yellow directional arrow triangle)
+    // 9. Draw Player Taxi Vehicle
     const cx = toMapX(car.position.x);
     const cy = toMapY(car.position.z);
 
-    ctx.save();
-    ctx.translate(cx, cy);
-    // Heading in radians (in canvas coordinate space: rot around Y corresponds to 2D rotation)
-    ctx.rotate(-car.heading);
+    if (playerCharacter && playerCharacter.isActive) {
+      // Parked Car as yellow outline rectangle
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-car.heading);
+      ctx.fillStyle = '#ffb703';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.fillRect(-3, -5, 6, 10);
+      ctx.strokeRect(-3, -5, 6, 10);
+      ctx.restore();
 
-    ctx.fillStyle = '#ffb703';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(0, 7);
-    ctx.lineTo(5, -6);
-    ctx.lineTo(0, -3);
-    ctx.lineTo(-5, -6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+      // On-Foot Player Character as Cyan Pulsing Dot with Pointer
+      const px = toMapX(playerCharacter.position.x);
+      const py = toMapY(playerCharacter.position.z);
+
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(-playerCharacter.heading);
+
+      ctx.fillStyle = '#00f0ff';
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Pointer direction
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, 7);
+      ctx.stroke();
+      ctx.restore();
+
+      // "YOU" Label
+      ctx.fillStyle = '#00f0ff';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('YOU', px, py - 7);
+
+    } else {
+      // Driving Car as Yellow Arrow
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-car.heading);
+
+      ctx.fillStyle = '#ffb703';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 8);
+      ctx.lineTo(6, -6);
+      ctx.lineTo(0, -3);
+      ctx.lineTo(-6, -6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Radar border ring
     ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';

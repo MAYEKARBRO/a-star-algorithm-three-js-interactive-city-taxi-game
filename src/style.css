@@ -67,7 +67,7 @@ html, body {
 }
 
 /* Allow interaction with buttons & cards */
-.hud-btn, .hud-card, .astar-drawer, .modal-celebration, .minimap-container, .modal-registration, .reg-modal-content, .driver-license-badge {
+.hud-btn, .hud-card, .astar-drawer, .modal-celebration, .minimap-container, .modal-registration, .reg-modal-content, .driver-license-badge, .joystick-base, .joystick-knob, .onfoot-action-btn {
   pointer-events: auto !important;
 }
 
@@ -1242,22 +1242,1091 @@ html, body {
 }
 
 /* -------------------------------------------------------------
-   RESPONSIVE LAYOUT
+   GTA TOP-RIGHT MONEY DISPLAY
 ------------------------------------------------------------- */
-@media (max-width: 900px) {
-  .mission-card {
-    width: 280px;
-    top: 65px;
-    left: 12px;
+.gta-money-panel {
+  position: absolute;
+  top: 72px;
+  right: 24px;
+  background: rgba(7, 11, 21, 0.9);
+  backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(16, 185, 129, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 20px rgba(16, 185, 129, 0.35);
+  padding: 10px 18px;
+  border-radius: 12px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.gta-cash-label {
+  font-family: var(--font-tech);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  margin-bottom: 2px;
+}
+
+.gta-money-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: 'Outfit', 'Inter', monospace, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: #22c55e;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 12px rgba(34, 197, 94, 0.6);
+  letter-spacing: 1px;
+}
+
+.gta-currency {
+  font-size: 24px;
+  color: #4ade80;
+  margin-right: 2px;
+}
+
+.gta-cash-diff {
+  font-family: var(--font-tech);
+  font-size: 14px;
+  font-weight: 800;
+  margin-top: 4px;
+  animation: diffBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gta-cash-diff.text-green {
+  color: #22c55e;
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+}
+
+.gta-cash-diff.text-red {
+  color: #ef4444;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+
+@keyframes diffBounce {
+  0% { transform: translateY(6px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* -------------------------------------------------------------
+   PLAYER VITALS CARD (HEALTH & STAMINA)
+------------------------------------------------------------- */
+.player-vitals-card {
+  position: absolute;
+  bottom: 215px;
+  left: 24px;
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  border-radius: 12px;
+  padding: 10px 14px;
+  width: 220px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vitals-mode-badge {
+  font-family: var(--font-tech);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.vitals-mode-badge.driving {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.vitals-mode-badge.on-foot {
+  background: rgba(0, 240, 255, 0.15);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.vitals-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-tech);
+  font-size: 11px;
+}
+
+.vitals-lbl {
+  width: 28px;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.vitals-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vitals-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+
+.health-fill {
+  background: linear-gradient(90deg, #10b981, #22c55e);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+.stamina-fill {
+  background: linear-gradient(90deg, #0284c7, #00f0ff);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+
+.vitals-num {
+  width: 24px;
+  text-align: right;
+  font-weight: 700;
+  color: #fff;
+  font-size: 10px;
+}
+
+/* -------------------------------------------------------------
+   GTA INTERACTION PROMPT
+------------------------------------------------------------- */
+.interaction-prompt {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 15, 28, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1.5px solid var(--accent-cyan);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.4), 0 8px 32px rgba(0, 0, 0, 0.8);
+  padding: 10px 22px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 150;
+  animation: promptPulse 1.8s infinite;
+  pointer-events: none;
+}
+
+@keyframes promptPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.4), 0 8px 32px rgba(0, 0, 0, 0.8); }
+  50% { box-shadow: 0 0 32px rgba(0, 240, 255, 0.7), 0 8px 32px rgba(0, 0, 0, 0.8); }
+}
+
+.prompt-key {
+  background: var(--accent-yellow);
+  color: #0f172a;
+  font-family: var(--font-tech);
+  font-size: 14px;
+  font-weight: 900;
+  padding: 3px 9px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.prompt-text {
+  font-family: var(--font-tech);
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: 1px;
+}
+
+/* -------------------------------------------------------------
+   GTA NPC DIALOGUE BOX
+------------------------------------------------------------- */
+.npc-dialogue-box {
+  position: absolute;
+  bottom: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 15, 28, 0.94);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  box-shadow: 0 0 35px rgba(0, 240, 255, 0.35), 0 12px 40px rgba(0, 0, 0, 0.8);
+  border-radius: 16px;
+  padding: 16px 20px;
+  width: 440px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 155;
+  animation: actionPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+.npc-diag-avatar {
+  font-size: 32px;
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.npc-diag-content {
+  flex: 1;
+}
+
+.npc-diag-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.npc-diag-name {
+  font-family: var(--font-tech);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--accent-cyan);
+  letter-spacing: 0.5px;
+}
+
+.npc-diag-tag {
+  font-family: var(--font-tech);
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--accent-cyan);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.npc-diag-text {
+  font-size: 13px;
+  font-style: italic;
+  color: #e2e8f0;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* -------------------------------------------------------------
+   GTA ON-FOOT ACTIONS DOCK (CLEAN VIEW - NO BULKY JOYSTICKS)
+------------------------------------------------------------- */
+.dual-joystick-overlay,
+.onfoot-overlay {
+  position: absolute;
+  bottom: 22px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 20px;
+  pointer-events: none;
+  z-index: 120;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.dual-joystick-overlay.hidden,
+.onfoot-overlay.hidden {
+  opacity: 0;
+  pointer-events: none !important;
+  transform: translateY(20px);
+  display: none !important;
+}
+
+/* Hide circular on-screen joysticks per user request */
+.joystick-wrapper {
+  display: none !important;
+}
+
+.joystick-base {
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.78) 0%, rgba(2, 6, 23, 0.92) 100%);
+  backdrop-filter: blur(14px);
+  border: 2px solid rgba(255, 183, 3, 0.45);
+  box-shadow: 0 0 24px rgba(255, 183, 3, 0.22), inset 0 0 18px rgba(0, 0, 0, 0.7);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  pointer-events: auto !important;
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.joystick-base:active {
+  cursor: grabbing;
+}
+
+.joystick-left .joystick-base {
+  border-color: rgba(255, 183, 3, 0.5);
+  box-shadow: 0 0 24px rgba(255, 183, 3, 0.25), inset 0 0 16px rgba(0, 0, 0, 0.6);
+}
+
+.joystick-right .joystick-base {
+  border-color: rgba(0, 240, 255, 0.55);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.25), inset 0 0 16px rgba(0, 0, 0, 0.6);
+}
+
+.joystick-guide-h {
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+.joystick-guide-v {
+  position: absolute;
+  height: 100%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+.joystick-ring {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.joy-dir-label {
+  position: absolute;
+  font-family: var(--font-tech);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+  text-transform: uppercase;
+  user-select: none;
+  z-index: 1;
+}
+
+.joy-dir-up {
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.joy-dir-down {
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.joy-dir-left {
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.joy-dir-right {
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.joystick-left .joy-dir-label {
+  color: rgba(255, 183, 3, 0.55);
+}
+
+.joystick-right .joy-dir-label {
+  color: rgba(0, 240, 255, 0.55);
+}
+
+.joystick-knob {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  border: 2px solid var(--accent-yellow);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 183, 3, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  will-change: transform;
+  font-size: 22px;
+  z-index: 2;
+}
+
+.joystick-right .joystick-knob {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 240, 255, 0.4);
+}
+
+.joystick-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(10px);
+  padding: 5px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.jb-title {
+  font-family: var(--font-tech);
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.jb-sub {
+  font-family: monospace;
+  font-size: 9px;
+  color: var(--accent-yellow);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.joystick-right .jb-sub {
+  color: var(--accent-cyan);
+}
+
+/* ON-FOOT ACTIONS DOCK (CENTER) */
+.onfoot-actions-dock {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  pointer-events: auto !important;
+  margin-bottom: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(14px);
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+}
+
+.onfoot-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 66px;
+  height: 66px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.2, 0.9, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.onfoot-action-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-cyan);
+}
+
+.onfoot-action-btn:active,
+.onfoot-action-btn.active {
+  transform: scale(0.93);
+  box-shadow: 0 0 16px var(--accent-cyan);
+}
+
+.btn-sprint.active {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+}
+
+.btn-jump.active {
+  background: rgba(56, 189, 248, 0.3);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.oab-icon {
+  font-size: 20px;
+}
+
+.oab-lbl {
+  font-family: var(--font-tech);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.pulse-glow {
+  animation: pulseGlow 1.2s infinite alternate ease-in-out;
+  border-color: #10b981 !important;
+  color: #10b981 !important;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 8px #10b981;
+    transform: scale(1);
   }
-  .gps-banner {
-    display: none;
-  }
-  .hud-topbar {
-    flex-wrap: wrap;
-  }
-  .minimap-container {
-    width: 160px;
-    height: 160px;
+  100% {
+    box-shadow: 0 0 24px #10b981, inset 0 0 12px rgba(16, 185, 129, 0.3);
+    transform: scale(1.05);
   }
 }
+
+/* CALL TAXI BUTTON STYLING */
+.hud-btn-gold {
+  background: linear-gradient(135deg, rgba(255, 183, 3, 0.28), rgba(245, 158, 11, 0.16));
+  border-color: rgba(255, 183, 3, 0.65);
+  color: #ffb703;
+  box-shadow: 0 0 14px rgba(255, 183, 3, 0.25);
+  font-weight: 800;
+}
+
+.hud-btn-gold:hover {
+  background: linear-gradient(135deg, rgba(255, 183, 3, 0.45), rgba(245, 158, 11, 0.3));
+  border-color: #ffd700;
+  box-shadow: 0 0 20px rgba(255, 183, 3, 0.45);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.btn-call-taxi {
+  background: linear-gradient(145deg, rgba(255, 183, 3, 0.28), rgba(245, 158, 11, 0.16)) !important;
+  border-color: rgba(255, 183, 3, 0.7) !important;
+  color: #ffb703 !important;
+  box-shadow: 0 4px 16px rgba(255, 183, 3, 0.25) !important;
+}
+
+.btn-call-taxi:hover,
+.btn-call-taxi:active {
+  background: linear-gradient(145deg, #ffb703, #f59e0b) !important;
+  color: #0f172a !important;
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 24px rgba(255, 183, 3, 0.65) !important;
+  transform: scale(1.06);
+}
+
+/* -------------------------------------------------------------
+   TAXI RADIO & MUSIC VOLUME ADJUSTMENT BAR (LEFT SIDE OF SCREEN)
+------------------------------------------------------------- */
+.taxi-radio-panel {
+  position: absolute;
+  left: 22px;
+  top: 48%;
+  transform: translateY(-50%);
+  width: 148px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 18px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 240, 255, 0.15);
+  z-index: 100;
+  pointer-events: auto !important;
+  user-select: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.taxi-radio-panel:hover {
+  border-color: rgba(0, 240, 255, 0.65);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75), 0 0 24px rgba(0, 240, 255, 0.25);
+}
+
+.radio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.radio-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.radio-icon {
+  font-size: 18px;
+}
+
+.radio-title-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.radio-tag {
+  font-family: var(--font-tech);
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  letter-spacing: 0.8px;
+}
+
+.radio-station {
+  font-family: var(--font-tech);
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+/* Animated Equalizer Bars */
+.radio-eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 16px;
+}
+
+.eq-bar {
+  width: 3px;
+  background: var(--accent-cyan);
+  border-radius: 2px;
+  animation: eqBounce 0.75s infinite ease-in-out alternate;
+}
+
+.eq-1 { height: 13px; animation-delay: 0.1s; }
+.eq-2 { height: 8px; animation-delay: 0.35s; background: var(--accent-yellow); }
+.eq-3 { height: 16px; animation-delay: 0.2s; }
+.eq-4 { height: 10px; animation-delay: 0.45s; background: var(--accent-yellow); }
+
+.radio-eq.paused .eq-bar {
+  animation-play-state: paused;
+  opacity: 0.35;
+  height: 4px !important;
+}
+
+@keyframes eqBounce {
+  0% { height: 4px; }
+  100% { height: 16px; }
+}
+
+.radio-track-row {
+  display: flex;
+  flex-direction: column;
+  background: rgba(2, 6, 23, 0.65);
+  border-radius: 8px;
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.track-status {
+  font-family: monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.track-status.playing {
+  color: #10b981;
+}
+
+.track-status.paused {
+  color: #94a3b8;
+}
+
+.track-title {
+  font-family: var(--font-tech);
+  font-size: 9.5px;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Vertical Volume Adjustment Bar */
+.radio-vol-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+}
+
+.radio-vol-step-btn {
+  width: 26px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.radio-vol-step-btn:hover {
+  background: var(--accent-cyan);
+  color: #0f172a;
+  border-color: #00f0ff;
+}
+
+.radio-slider-container {
+  position: relative;
+  width: 32px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radio-track-visual {
+  position: absolute;
+  width: 9px;
+  height: 86px;
+  background: rgba(30, 41, 59, 0.9);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.radio-vol-fill {
+  width: 100%;
+  background: linear-gradient(to top, var(--accent-cyan), var(--accent-yellow));
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  transition: height 0.08s ease;
+}
+
+.radio-range-vertical {
+  -webkit-appearance: slider-vertical;
+  writing-mode: bt-lr;
+  width: 28px;
+  height: 86px;
+  opacity: 0.06;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.radio-vol-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(2, 6, 23, 0.7);
+  padding: 2px 7px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.radio-vol-label {
+  font-family: monospace;
+  font-size: 8px;
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.radio-vol-val {
+  font-family: var(--font-tech);
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Radio Footer Controls */
+.radio-footer-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.radio-ctrl-btn {
+  flex: 1;
+  height: 25px;
+  border-radius: 7px;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.radio-ctrl-btn:hover {
+  background: rgba(255, 183, 3, 0.3);
+  border-color: var(--accent-yellow);
+  color: #fff;
+}
+
+/* -------------------------------------------------------------
+   CINEMATIC "WELCOME TO MAYEKARBRO CITY" TITLE CARD SCREEN
+------------------------------------------------------------- */
+.welcome-city-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.94) 0%, rgba(2, 6, 23, 0.98) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.welcome-city-screen.welcome-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.welcome-city-screen.welcome-exit {
+  opacity: 0 !important;
+  transform: scale(1.06) !important;
+  filter: blur(8px) !important;
+  pointer-events: none;
+  transition: all 0.48s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.welcome-backdrop-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.welcome-card {
+  position: relative;
+  max-width: 760px;
+  width: 90%;
+  text-align: center;
+  padding: 44px 34px;
+  border-radius: 28px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1.5px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 
+    0 0 60px rgba(0, 240, 255, 0.25),
+    0 25px 60px rgba(0, 0, 0, 0.8),
+    inset 0 0 35px rgba(0, 240, 255, 0.08);
+  transform: scale(0.92);
+  opacity: 0;
+  filter: blur(8px);
+}
+
+.welcome-active .welcome-card {
+  animation: welcomeCardEntrance 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes welcomeCardEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+    filter: blur(10px);
+    letter-spacing: -1px;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+    letter-spacing: normal;
+  }
+}
+
+.welcome-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: var(--accent-cyan);
+  font-family: var(--font-tech);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.2);
+}
+
+.wcb-star {
+  color: var(--accent-yellow);
+}
+
+.welcome-hero-text {
+  margin-bottom: 18px;
+}
+
+.welcome-sub-greeting {
+  font-family: var(--font-tech);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.welcome-title {
+  font-family: var(--font-tech);
+  font-size: clamp(34px, 5.5vw, 58px);
+  font-weight: 900;
+  line-height: 1.15;
+  margin: 0;
+  text-transform: uppercase;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 18px;
+}
+
+.wt-mayekarbro {
+  background: linear-gradient(135deg, #ffffff 0%, #ffb703 45%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 25px rgba(255, 183, 3, 0.65));
+}
+
+.wt-city {
+  background: linear-gradient(135deg, #e0f2fe 0%, #00f0ff 45%, #0284c7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 25px rgba(0, 240, 255, 0.75));
+}
+
+.welcome-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 20px auto;
+  max-width: 480px;
+}
+
+.wd-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.4), transparent);
+}
+
+.wd-symbol {
+  font-size: 24px;
+  filter: drop-shadow(0 0 10px rgba(255, 183, 3, 0.8));
+  animation: symbolPulse 2s infinite ease-in-out;
+}
+
+@keyframes symbolPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.welcome-driver-callout {
+  margin-bottom: 26px;
+}
+
+.wdc-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 8px 18px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.wdc-label {
+  font-family: monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  letter-spacing: 1px;
+}
+
+.wdc-name {
+  font-family: var(--font-tech);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--accent-yellow);
+  letter-spacing: 1px;
+}
+
+.wdc-meta {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: #cbd5e1;
+  letter-spacing: 0.5px;
+}
+
+/* DYNAMIC PROGRESS LAUNCH BAR */
+.welcome-loader-track {
+  width: 100%;
+  max-width: 380px;
+  height: 5px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 4px;
+  margin: 0 auto 16px auto;
+  overflow: hidden;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.welcome-loader-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-yellow));
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.8);
+}
+
+@keyframes welcomeLoaderBar {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+.welcome-skip-hint {
+  font-family: var(--font-tech);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #64748b;
+  text-transform: uppercase;
+  transition: color 0.2s ease;
+}
+
+.welcome-card:hover .welcome-skip-hint {
+  color: var(--accent-cyan);
+}
+
+
+

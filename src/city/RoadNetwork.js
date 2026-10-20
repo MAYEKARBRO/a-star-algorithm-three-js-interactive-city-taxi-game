@@ -8,45 +8,54 @@ export class RoadNetwork {
   constructor() {
     this.graph = new RoadGraph();
 
-    // City grid configuration
-    this.gridSizeX = 7; // Number of North-South avenues
-    this.gridSizeZ = 7; // Number of East-West streets
+    // City grid configuration (Expanded 9x9 Metropolis: 81 Intersections, 64 City Blocks)
+    this.gridSizeX = 9; // Number of North-South avenues
+    this.gridSizeZ = 9; // Number of East-West streets
     this.spacing = 70;  // Distance between intersections (meters)
     this.halfSizeX = ((this.gridSizeX - 1) * this.spacing) / 2;
     this.halfSizeZ = ((this.gridSizeZ - 1) * this.spacing) / 2;
 
     this.avenueNames = [
+      '1st Harbor Parkway',
       'Broadway Ave',
       'Neon Boulevard',
       'Cyber Expressway',
       'Central Park Ave',
       'Grand Avenue',
       'Skyline Parkway',
-      'Sunset Drive'
+      'Sunset Drive',
+      '9th Ocean Boulevard'
     ];
 
     this.streetNames = [
-      '1st Marina St',
+      '1st Marina Quay',
       'Tech Boulevard',
       'Plaza Promenade',
       'Center Street',
       'Emerald Way',
       'Innovation Ave',
-      'Summit Road'
+      'Summit Road',
+      'Timberline Way',
+      'Northpoint Ridge'
     ];
 
     // Landmarks mapped to specific intersection grid coordinates [ix, iz]
     this.landmarks = [
-      { id: 'grand_central', name: 'Grand Central Station', gridX: 3, gridZ: 3, district: 'Downtown Central' },
-      { id: 'times_square', name: 'Times Neon Plaza', gridX: 1, gridZ: 2, district: 'Cyber District' },
-      { id: 'skyline_tower', name: 'Skyline Financial Center', gridX: 5, gridZ: 1, district: 'Financial District' },
-      { id: 'emerald_park', name: 'Emerald Park Pavilion', gridX: 2, gridZ: 4, district: 'Park District' },
-      { id: 'marina_bay', name: 'Cyber Bay Marina', gridX: 0, gridZ: 0, district: 'Marina Waterfront' },
-      { id: 'metropolis_hotel', name: 'Metropolis Luxury Hotel', gridX: 5, gridZ: 5, district: 'Midtown' },
-      { id: 'sunset_plaza', name: 'Sunset Boulevard Shops', gridX: 6, gridZ: 3, district: 'West End' },
-      { id: 'tech_campus', name: 'Nexus Tech Campus', gridX: 1, gridZ: 5, district: 'Silicon Quarter' },
-      { id: 'vanguard_art', name: 'Vanguard Contemporary Art', gridX: 4, gridZ: 2, district: 'Cultural Center' },
-      { id: 'summit_deck', name: 'Summit Observation Hub', gridX: 6, gridZ: 6, district: 'Sky District' }
+      { id: 'driver_safehouse', name: "Driver's Safehouse & Garage", gridX: 1, gridZ: 6, district: 'Industrial Quarter', type: 'safehouse', icon: '🏠' },
+      { id: 'basketball_court', name: 'Downtown Street Basketball Court', gridX: 5, gridZ: 2, district: 'Midtown Recreation', type: 'basketball', icon: '🏀' },
+      { id: 'emerald_park', name: 'Metropolis Central Gardens', gridX: 3, gridZ: 3, district: 'Central Park', type: 'park', icon: '🌳' },
+      { id: 'hospital', name: 'Metropolis General Hospital', gridX: 6, gridZ: 6, district: 'Medical District', type: 'hospital', icon: '🏥' },
+      { id: 'police_station', name: 'Metropolis Police HQ (Precinct 99)', gridX: 2, gridZ: 1, district: 'Civic Center', type: 'police', icon: '🚓' },
+      { id: 'fire_station', name: 'Metropolis Fire Station 51', gridX: 1, gridZ: 2, district: 'Emergency Services', type: 'fire', icon: '🚒' },
+      { id: 'google_hq', name: 'Google Tech Campus', gridX: 5, gridZ: 5, district: 'Silicon Metropolis', type: 'google', icon: '🌐' },
+      { id: 'residential_quarter', name: 'Maplewood Residential Gardens', gridX: 2, gridZ: 7, district: 'Residential Hills', type: 'residential', icon: '🏡' },
+      { id: 'grand_central', name: 'Grand Central Station', gridX: 4, gridZ: 3, district: 'Downtown Central', type: 'transit', icon: '🚊' },
+      { id: 'times_square', name: 'Times Neon Plaza', gridX: 2, gridZ: 3, district: 'Cyber District', type: 'commercial', icon: '✨' },
+      { id: 'skyline_tower', name: 'Skyline Financial Center', gridX: 6, gridZ: 4, district: 'Financial District', type: 'commercial', icon: '🏢' },
+      { id: 'marina_bay', name: 'Cyber Bay Marina', gridX: 0, gridZ: 0, district: 'Marina Waterfront', type: 'waterfront', icon: '⛵' },
+      { id: 'metropolis_hotel', name: 'Metropolis Luxury Hotel', gridX: 7, gridZ: 5, district: 'Midtown', type: 'hotel', icon: '🏨' },
+      { id: 'sunset_plaza', name: 'Sunset Boulevard Shops', gridX: 7, gridZ: 3, district: 'West End', type: 'shops', icon: '🛍️' },
+      { id: 'summit_deck', name: 'Summit Observation Hub', gridX: 8, gridZ: 8, district: 'Sky District', type: 'viewpoint', icon: '🗼' }
     ];
 
     this.intersections = [];

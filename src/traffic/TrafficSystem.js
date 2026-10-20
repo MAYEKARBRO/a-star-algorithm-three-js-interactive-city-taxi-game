@@ -440,15 +440,18 @@ export class TrafficSystem {
     ];
 
     let vIdx = 0;
+    const totalSpanX = this.roadNetwork.halfSizeX * 2;
+    const totalSpanZ = this.roadNetwork.halfSizeZ * 2;
 
-    // Spawn 20 vehicles across streets and avenues
-    for (let i = 0; i < 7; i++) {
-      // East-West streets
+    // Spawn vehicles dynamically across all East-West streets and North-South avenues
+    for (let i = 0; i < this.roadNetwork.gridSizeZ; i++) {
       const streetZ = (i * spacing - this.roadNetwork.halfSizeZ);
+
+      // Eastbound traffic
       const vType1 = vehicleRoster[vIdx++ % vehicleRoster.length];
       const carA = new TrafficVehicle(
         this.scene,
-        -this.roadNetwork.halfSizeX + Math.random() * 220,
+        -this.roadNetwork.halfSizeX + Math.random() * totalSpanX,
         streetZ + laneOffset,
         true,
         1,
@@ -457,10 +460,11 @@ export class TrafficSystem {
       );
       this.trafficCars.push(carA);
 
+      // Westbound traffic
       const vType2 = vehicleRoster[vIdx++ % vehicleRoster.length];
       const carB = new TrafficVehicle(
         this.scene,
-        this.roadNetwork.halfSizeX - Math.random() * 220,
+        this.roadNetwork.halfSizeX - Math.random() * totalSpanX,
         streetZ - laneOffset,
         true,
         -1,
@@ -468,22 +472,36 @@ export class TrafficSystem {
         vType2
       );
       this.trafficCars.push(carB);
+    }
 
-      // North-South avenues
-      if (i < 6) {
-        const avenueX = (i * spacing - this.roadNetwork.halfSizeX);
-        const vType3 = vehicleRoster[vIdx++ % vehicleRoster.length];
-        const carC = new TrafficVehicle(
-          this.scene,
-          avenueX - laneOffset,
-          -this.roadNetwork.halfSizeZ + Math.random() * 220,
-          false,
-          1,
-          this.roadNetwork,
-          vType3
-        );
-        this.trafficCars.push(carC);
-      }
+    for (let j = 0; j < this.roadNetwork.gridSizeX; j++) {
+      const avenueX = (j * spacing - this.roadNetwork.halfSizeX);
+
+      // Southbound traffic
+      const vType3 = vehicleRoster[vIdx++ % vehicleRoster.length];
+      const carC = new TrafficVehicle(
+        this.scene,
+        avenueX - laneOffset,
+        -this.roadNetwork.halfSizeZ + Math.random() * totalSpanZ,
+        false,
+        1,
+        this.roadNetwork,
+        vType3
+      );
+      this.trafficCars.push(carC);
+
+      // Northbound traffic
+      const vType4 = vehicleRoster[vIdx++ % vehicleRoster.length];
+      const carD = new TrafficVehicle(
+        this.scene,
+        avenueX + laneOffset,
+        this.roadNetwork.halfSizeZ - Math.random() * totalSpanZ,
+        false,
+        -1,
+        this.roadNetwork,
+        vType4
+      );
+      this.trafficCars.push(carD);
     }
   }
 

@@ -49,6 +49,17 @@ export class Engine {
     this.orbitPhi = 0.4;
     this.orbitDistance = 14;
 
+    // On-Foot 3rd Person Pan Camera (GTA Style)
+    this.onFootCamera = {
+      yaw: 0,
+      pitch: 0.26,
+      distance: 5.2,
+      height: 1.5,
+      sensitivity: 2.2,
+      manualCooldown: 0,
+      backwardTimer: 0
+    };
+
     // 3. Lighting Setup
     this._setupLighting();
     this._initRainParticles();
@@ -292,44 +303,139 @@ export class Engine {
   }
 
   /**
+   * Returns current on-foot camera horizontal yaw angle in radians.
+   */
+  getCameraYaw() {
+    return this.onFootCamera ? this.onFootCamera.yaw : 0;
+  }
+
+  /**
+   * Sets on-foot camera yaw (e.g. when exiting taxi to match car orientation).
+   */
+  setOnFootCameraYaw(yaw) {
+    if (this.onFootCamera) {
+      this.onFootCamera.yaw = yaw;
+      this.onFootCamera.manualCooldown = 0;
+      this.onFootCamera.backwardTimer = 0;
+    }
+  }
+
+  /**
    * Updates camera tracking based on car position and user input.
    * @param {number} delta
-   * @param {import('../gameplay/Car.js').Car} car
+   * @param {import('../gameplay/Car.js').Car|import('../gameplay/PlayerCharacter.js').PlayerCharacter} targetEntity
    * @param {{ deltaX: number, deltaY: number, zoom: number }} cameraInput
+   * @param {boolean} isOnFoot
    */
-  updateCamera(delta, car, cameraInput) {
-    const carPos = car.position;
-    const carRotY = car.heading;
+  updateCamera(delta, targetEntity, cameraInput, isOnFoot = false) {
+    const targetPos = targetEntity.position;
+    const targetHeading = targetEntity.heading;
 
-    if (this.cameraMode === 'CHASE') {
-      // 1. Dynamic Third-Person Chase Camera
-      // Calculate ideal camera position behind the car relative to car heading
-      const forwardX = Math.sin(carRotY);
-      const forwardZ = Math.cos(carRotY);
+    if (isOnFoot) {
+      // 1. Third-Person On-Foot Camera (GTA Style)
+      // Process Right Joystick / Mouse manual camera panning
+      const manualYawDelta = cameraInput ? (cameraInput.deltaX || 0) : 0;
+      const manualPitchDelta = cameraInput ? (cameraInput.deltaY || 0) : 0;
+      const isManualPanning = Math.abs(manualYawDelta) > 0.001 || Math.abs(manualPitchDelta) > 0.001;
 
-      // High-speed dynamic FOV & distance push-back
-      const speedFactor = Math.min(1.0, Math.abs(car.speed) / car.maxSpeed);
+      if (isManualPanning) {
+        this.onFootCamera.yaw += manualYawDelta * this.onFootCamera.sensitivity;
+        this.onFootCamera.pitch = Math.max(
+          -0.15,
+          Math.min(1.15, this.onFootCamera.pitch - manualPitchDelta * this.onFootCamera.sensitivity)
+        );
+        this.onFootCamera.manualCooldown = 0.85; // Pause auto-follow during and briefly after manual pan
+      } else if (this.onFootCamera.manualCooldown > 0) {
+        this.onFootCamera.manualCooldown -= delta;
+      }
+
+      if (cameraInput && cameraInput.zoom) {
+        this.onFootCamera.distance = Math.max(2.5, Math.min(10.0, this.onFootCamera.distance + cameraInput.zoom * 1.5));
+      }
+
+      // 2. Natural Auto-Follow Behind Character:
+      // When moving and not manually panning, camera naturally glides directly behind character's back
+      const isMoving = targetEntity.speed > 0.35;
+      if (isMoving && this.onFootCamera.manualCooldown <= 0) {
+        let diff = targetHeading - this.onFootCamera.yaw;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+
+        // If pulling backward (diff > ~130 deg), don't flip camera 180 immediately to avoid jitter
+        const isMovingBackward = Math.abs(diff) > 2.25;
+        if (isMovingBackward) {
+          this.onFootCamera.backwardTimer = (this.onFootCamera.backwardTimer || 0) + delta;
+        } else {
+          this.onFootCamera.backwardTimer = 0;
+        }
+
+        if (!isMovingBackward || this.onFootCamera.backwardTimer > 1.1) {
+          const followSpeed = targetEntity.isSprinting ? 4.6 : 3.2;
+          this.onFootCamera.yaw += diff * Math.min(1.0, delta * followSpeed);
+        }
+
+        // Gently return pitch to comfortable default (0.24 rad)
+        this.onFootCamera.pitch = THREE.MathUtils.lerp(this.onFootCamera.pitch, 0.24, delta * 1.2);
+      }
+
+      const yaw = this.onFootCamera.yaw;
+      const pitch = this.onFootCamera.pitch;
+      const dist = this.onFootCamera.distance;
+
+      // Spherical position offset behind target
+      const offsetX = Math.sin(yaw) * Math.cos(pitch) * dist;
+      const offsetZ = Math.cos(yaw) * Math.cos(pitch) * dist;
+      const offsetY = Math.sin(pitch) * dist + this.onFootCamera.height;
+
+      const targetCamX = targetPos.x - offsetX;
+      const targetCamY = targetPos.y + offsetY;
+      const targetCamZ = targetPos.z - offsetZ;
+
+      const smoothFactor = Math.min(1.0, delta * 14.0);
+      this.currentCameraPos.x = THREE.MathUtils.lerp(this.currentCameraPos.x, targetCamX, smoothFactor);
+      this.currentCameraPos.y = THREE.MathUtils.lerp(this.currentCameraPos.y, targetCamY, smoothFactor);
+      this.currentCameraPos.z = THREE.MathUtils.lerp(this.currentCameraPos.z, targetCamZ, smoothFactor);
+
+      // Target to look at is player's torso / head
+      const lookTargetX = targetPos.x;
+      const lookTargetY = targetPos.y + this.onFootCamera.height;
+      const lookTargetZ = targetPos.z;
+
+      this.currentCameraTarget.x = THREE.MathUtils.lerp(this.currentCameraTarget.x, lookTargetX, smoothFactor);
+      this.currentCameraTarget.y = THREE.MathUtils.lerp(this.currentCameraTarget.y, lookTargetY, smoothFactor);
+      this.currentCameraTarget.z = THREE.MathUtils.lerp(this.currentCameraTarget.z, lookTargetZ, smoothFactor);
+
+      this.camera.position.copy(this.currentCameraPos);
+      this.camera.lookAt(this.currentCameraTarget);
+
+      this.camera.fov = 60;
+      this.camera.updateProjectionMatrix();
+
+    } else if (this.cameraMode === 'CHASE') {
+      // 2. Dynamic Third-Person Vehicle Chase Camera
+      const forwardX = Math.sin(targetHeading);
+      const forwardZ = Math.cos(targetHeading);
+
+      const speedFactor = Math.min(1.0, Math.abs(targetEntity.speed) / (targetEntity.maxSpeed || 38));
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, 60 + speedFactor * 14, delta * 4);
       this.camera.updateProjectionMatrix();
 
       const backDistance = 9.0 + speedFactor * 3.0;
       const height = 4.2 + speedFactor * 0.5;
 
-      const targetCamX = carPos.x - forwardX * backDistance;
-      const targetCamZ = carPos.z - forwardZ * backDistance;
-      const targetCamY = carPos.y + height;
+      const targetCamX = targetPos.x - forwardX * backDistance;
+      const targetCamZ = targetPos.z - forwardZ * backDistance;
+      const targetCamY = targetPos.y + height;
 
-      // Smooth lag / interpolation
       const smoothFactor = Math.min(1.0, delta * 9.0);
       this.currentCameraPos.x = THREE.MathUtils.lerp(this.currentCameraPos.x, targetCamX, smoothFactor);
       this.currentCameraPos.y = THREE.MathUtils.lerp(this.currentCameraPos.y, targetCamY, smoothFactor);
       this.currentCameraPos.z = THREE.MathUtils.lerp(this.currentCameraPos.z, targetCamZ, smoothFactor);
 
-      // Look at car slightly ahead of center
       const lookAheadDist = 3.5 + speedFactor * 4.0;
-      const lookTargetX = carPos.x + forwardX * lookAheadDist;
-      const lookTargetZ = carPos.z + forwardZ * lookAheadDist;
-      const lookTargetY = carPos.y + 1.2;
+      const lookTargetX = targetPos.x + forwardX * lookAheadDist;
+      const lookTargetZ = targetPos.z + forwardZ * lookAheadDist;
+      const lookTargetY = targetPos.y + 1.2;
 
       this.currentCameraTarget.x = THREE.MathUtils.lerp(this.currentCameraTarget.x, lookTargetX, smoothFactor);
       this.currentCameraTarget.y = THREE.MathUtils.lerp(this.currentCameraTarget.y, lookTargetY, smoothFactor);
@@ -340,18 +446,18 @@ export class Engine {
 
     } else if (this.cameraMode === 'HOOD') {
       // 2. Cockpit / Hood Camera
-      const forwardX = Math.sin(carRotY);
-      const forwardZ = Math.cos(carRotY);
+      const forwardX = Math.sin(targetHeading);
+      const forwardZ = Math.cos(targetHeading);
 
       this.camera.position.set(
-        carPos.x + forwardX * 1.3,
-        carPos.y + 1.2,
-        carPos.z + forwardZ * 1.3
+        targetPos.x + forwardX * 1.3,
+        targetPos.y + 1.2,
+        targetPos.z + forwardZ * 1.3
       );
       this.camera.lookAt(
-        carPos.x + forwardX * 25,
-        carPos.y + 1.1,
-        carPos.z + forwardZ * 25
+        targetPos.x + forwardX * 25,
+        targetPos.y + 1.1,
+        targetPos.z + forwardZ * 25
       );
 
     } else if (this.cameraMode === 'ORBIT') {
@@ -360,18 +466,18 @@ export class Engine {
       this.orbitPhi = Math.max(0.1, Math.min(Math.PI / 2.2, this.orbitPhi + cameraInput.deltaY));
       this.orbitDistance = Math.max(6, Math.min(35, this.orbitDistance + cameraInput.zoom * 2));
 
-      const camX = carPos.x + this.orbitDistance * Math.sin(this.orbitTheta) * Math.cos(this.orbitPhi);
-      const camY = carPos.y + this.orbitDistance * Math.sin(this.orbitPhi);
-      const camZ = carPos.z + this.orbitDistance * Math.cos(this.orbitTheta) * Math.cos(this.orbitPhi);
+      const camX = targetPos.x + this.orbitDistance * Math.sin(this.orbitTheta) * Math.cos(this.orbitPhi);
+      const camY = targetPos.y + this.orbitDistance * Math.sin(this.orbitPhi);
+      const camZ = targetPos.z + this.orbitDistance * Math.cos(this.orbitTheta) * Math.cos(this.orbitPhi);
 
       this.camera.position.set(camX, camY, camZ);
-      this.camera.lookAt(carPos.x, carPos.y + 1.0, carPos.z);
+      this.camera.lookAt(targetPos.x, targetPos.y + 1.0, targetPos.z);
     }
 
-    // Update rain particles falling animation centered on player car
+    // Update rain particles falling animation centered on player
     if (this.rainParticles && this.rainParticles.visible) {
-      this.rainParticles.position.x = carPos.x;
-      this.rainParticles.position.z = carPos.z;
+      this.rainParticles.position.x = targetPos.x;
+      this.rainParticles.position.z = targetPos.z;
       const posAttr = this.rainParticles.geometry.attributes.position;
       const positions = posAttr.array;
       for (let i = 0; i < this.rainVelocities.length; i++) {
@@ -388,9 +494,9 @@ export class Engine {
     // Update drifting volumetric clouds
     this._updateClouds(delta);
 
-    // Keep directional sunlight centered around player car for crisp shadow maps
-    this.dirLight.position.set(carPos.x + 60, 120, carPos.z + 60);
-    this.dirLight.target.position.copy(carPos);
+    // Keep directional sunlight centered around player for crisp shadow maps
+    this.dirLight.position.set(targetPos.x + 60, 120, targetPos.z + 60);
+    this.dirLight.target.position.copy(targetPos);
     this.dirLight.target.updateMatrixWorld();
   }
 

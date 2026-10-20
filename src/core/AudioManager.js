@@ -29,6 +29,73 @@ export class AudioManager {
     this.hornOsc2 = null;
     this.hornGain = null;
     this.isHonking = false;
+
+    // Non-Copyright Taxi Radio & Music System
+    this.musicGain = null;
+    this.musicFilter = null;
+    this.musicVolume = 0.65; // 0.0 to 1.0
+    this.isMusicMuted = false;
+    this.isInTaxi = true;
+    this.currentStationIndex = 0;
+    this.isRadioPlaying = false;
+    this.currentStep = 0;
+    this.schedulerTimer = null;
+    this.nextNoteTime = 0;
+
+    // Royalty-Free Procedural Synthwave / Lo-Fi / Cyberpunk Radio Stations
+    this.radioStations = [
+      {
+        id: 'neon',
+        name: '88.5 NEON SYNTH',
+        tag: 'RETRO SYNTHWAVE',
+        track: 'Midnight Highway',
+        bpm: 112,
+        bassNotes: [55.0, 55.0, 55.0, 55.0, 43.65, 43.65, 43.65, 43.65, 65.41, 65.41, 65.41, 65.41, 49.0, 49.0, 49.0, 49.0], // A1, F1, C2, G1
+        chords: [
+          [220.0, 261.63, 329.63, 392.0], // Am7
+          [174.61, 220.0, 261.63, 329.63], // Fmaj7
+          [261.63, 329.63, 392.0, 523.25], // Cmaj7
+          [196.0, 246.94, 293.66, 392.0]   // G
+        ],
+        arpNotes: [440.0, 523.25, 659.25, 783.99, 659.25, 523.25, 880.0, 659.25],
+        leadWave: 'sawtooth',
+        bassWave: 'sawtooth'
+      },
+      {
+        id: 'lofi',
+        name: '94.2 LO-FI NIGHTS',
+        tag: 'CHILL JAZZHOP',
+        track: 'Sunset Dreams',
+        bpm: 84,
+        bassNotes: [73.42, 73.42, 65.41, 65.41, 58.27, 58.27, 55.0, 55.0], // D2, C2, Bb1, A1
+        chords: [
+          [293.66, 349.23, 440.0, 523.25], // Dm7
+          [261.63, 329.63, 392.0, 493.88], // Cmaj7
+          [233.08, 293.66, 349.23, 440.0], // Bbmaj7
+          [220.0, 277.18, 329.63, 392.0]   // A7
+        ],
+        arpNotes: [587.33, 659.25, 698.46, 783.99, 880.0, 698.46, 587.33, 523.25],
+        leadWave: 'triangle',
+        bassWave: 'triangle'
+      },
+      {
+        id: 'cyber',
+        name: '103.7 CYBER DRIVE',
+        tag: 'OUTRUN ELECTRO',
+        track: 'Neon Overdrive',
+        bpm: 124,
+        bassNotes: [82.41, 82.41, 82.41, 82.41, 73.42, 73.42, 87.31, 87.31], // E2, D2, F2
+        chords: [
+          [164.81, 196.0, 246.94, 329.63], // Em
+          [146.83, 174.61, 220.0, 293.66], // Dm
+          [174.61, 220.0, 261.63, 349.23], // F
+          [196.0, 246.94, 293.66, 392.0]   // G
+        ],
+        arpNotes: [659.25, 783.99, 987.77, 880.0, 659.25, 987.77, 1174.66, 880.0],
+        leadWave: 'sawtooth',
+        bassWave: 'square'
+      }
+    ];
   }
 
   /**
@@ -43,6 +110,8 @@ export class AudioManager {
 
       this._setupEngineAudio();
       this._setupTireScreechAudio();
+      this._setupRadioAudio();
+      this.startRadio();
 
       this.isInitialized = true;
     } catch (e) {
@@ -487,6 +556,346 @@ export class AudioManager {
     if (this.engineGain) {
       this.engineGain.gain.setValueAtTime(this.isMuted ? 0 : 0.08, this.ctx.currentTime);
     }
+    if (this.musicGain) {
+      const targetGain = (this.isMuted || this.isMusicMuted || !this.isInTaxi) ? 0 : this.musicVolume;
+      this.musicGain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    }
     return this.isMuted;
+  }
+
+  // =========================================================================
+  // NON-COPYRIGHT TAXI RADIO & MUSIC SYNTHESIS ENGINE
+  // =========================================================================
+
+  _setupRadioAudio() {
+    if (!this.ctx) return;
+
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
+
+    this.musicFilter = this.ctx.createBiquadFilter();
+    this.musicFilter.type = 'lowpass';
+    this.musicFilter.frequency.setValueAtTime(18000, this.ctx.currentTime);
+    this.musicFilter.Q.setValueAtTime(1.0, this.ctx.currentTime);
+
+    this.musicFilter.connect(this.musicGain);
+    this.musicGain.connect(this.ctx.destination);
+  }
+
+  startRadio() {
+    if (!this.ctx || this.isRadioPlaying) return;
+    this.isRadioPlaying = true;
+    this.currentStep = 0;
+    this.nextNoteTime = this.ctx.currentTime + 0.1;
+    this._scheduleRadio();
+  }
+
+  stopRadio() {
+    this.isRadioPlaying = false;
+    if (this.schedulerTimer) {
+      clearTimeout(this.schedulerTimer);
+      this.schedulerTimer = null;
+    }
+  }
+
+  _scheduleRadio() {
+    if (!this.isRadioPlaying || !this.ctx) return;
+
+    const station = this.radioStations[this.currentStationIndex];
+    const secondsPerBeat = 60.0 / station.bpm;
+    const secondsPer16th = secondsPerBeat / 4;
+
+    // Lookahead schedule: queue notes up to 0.18s into the future
+    while (this.nextNoteTime < this.ctx.currentTime + 0.18) {
+      if (this.isInTaxi && !this.isMuted && !this.isMusicMuted) {
+        this._playStep(this.currentStep, this.nextNoteTime, station, secondsPer16th);
+      }
+      this.nextNoteTime += secondsPer16th;
+      this.currentStep = (this.currentStep + 1) % 64;
+    }
+
+    this.schedulerTimer = setTimeout(() => this._scheduleRadio(), 45);
+  }
+
+  _playStep(step, time, station, stepDuration) {
+    const stepInBar = step % 16;
+    const barIndex = Math.floor(step / 16) % 4;
+
+    // 1. Kick Drum (Beats 0 & 8 in 16-step bar)
+    if (stepInBar === 0 || stepInBar === 8) {
+      this._playKick(time);
+    }
+
+    // 2. Snare / Clap (Beats 4 & 12 in 16-step bar)
+    if (stepInBar === 4 || stepInBar === 12) {
+      this._playSnare(time);
+    }
+
+    // 3. Hi-Hats (Eighth notes + open hat syncopation)
+    if (stepInBar % 2 === 0) {
+      const isOpen = (stepInBar === 6 || stepInBar === 14);
+      this._playHiHat(time, isOpen);
+    }
+
+    // 4. Bassline (Syncopated 8th-note driving groove)
+    if (stepInBar === 0 || stepInBar === 2 || stepInBar === 4 || stepInBar === 6 ||
+        stepInBar === 8 || stepInBar === 10 || stepInBar === 12 || stepInBar === 14) {
+      const bassIndex = (barIndex * 4 + Math.floor(stepInBar / 4)) % station.bassNotes.length;
+      const bassFreq = station.bassNotes[bassIndex];
+      this._playBass(bassFreq, time, stepDuration * 1.8, station.bassWave);
+    }
+
+    // 5. Chords / Pad (Sustained at start of each 16-step bar)
+    if (stepInBar === 0) {
+      const chord = station.chords[barIndex % station.chords.length];
+      this._playChord(chord, time, stepDuration * 14.0);
+    }
+
+    // 6. Arpeggiated Lead Melody (16th-note sequence)
+    if (stepInBar % 2 === 1 || stepInBar === 3 || stepInBar === 7 || stepInBar === 11 || stepInBar === 15) {
+      const arpFreq = station.arpNotes[(stepInBar + barIndex * 2) % station.arpNotes.length];
+      this._playArp(arpFreq, time, stepDuration * 1.4, station.leadWave);
+    }
+  }
+
+  _playKick(time) {
+    if (!this.ctx || !this.musicFilter) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(135, time);
+    osc.frequency.exponentialRampToValueAtTime(32, time + 0.08);
+
+    gain.gain.setValueAtTime(0.25, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+
+    osc.connect(gain);
+    gain.connect(this.musicFilter);
+    osc.start(time);
+    osc.stop(time + 0.18);
+  }
+
+  _playSnare(time) {
+    if (!this.ctx || !this.musicFilter) return;
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.1);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1800, time);
+    filter.Q.setValueAtTime(2.2, time);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.14, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.11);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicFilter);
+    noise.start(time);
+
+    // Body punch
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(180, time);
+    osc.frequency.exponentialRampToValueAtTime(65, time + 0.06);
+
+    oscGain.gain.setValueAtTime(0.12, time);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+
+    osc.connect(oscGain);
+    oscGain.connect(this.musicFilter);
+    osc.start(time);
+    osc.stop(time + 0.08);
+  }
+
+  _playHiHat(time, isOpen = false) {
+    if (!this.ctx || !this.musicFilter) return;
+    const dur = isOpen ? 0.12 : 0.035;
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(7800, time);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(isOpen ? 0.07 : 0.045, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicFilter);
+    noise.start(time);
+  }
+
+  _playBass(freq, time, dur, waveType) {
+    if (!this.ctx || !this.musicFilter) return;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = waveType || 'sawtooth';
+    osc.frequency.setValueAtTime(freq, time);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(550, time);
+    filter.frequency.exponentialRampToValueAtTime(160, time + dur);
+    filter.Q.setValueAtTime(3.2, time);
+
+    gain.gain.setValueAtTime(0.19, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicFilter);
+
+    osc.start(time);
+    osc.stop(time + dur + 0.02);
+  }
+
+  _playChord(notes, time, dur) {
+    if (!this.ctx || !this.musicFilter) return;
+    notes.forEach((freq) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, time);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(850, time);
+      filter.Q.setValueAtTime(1.2, time);
+
+      gain.gain.setValueAtTime(0.001, time);
+      gain.gain.linearRampToValueAtTime(0.032, time + 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.musicFilter);
+
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+    });
+  }
+
+  _playArp(freq, time, dur, waveType) {
+    if (!this.ctx || !this.musicFilter) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = waveType || 'triangle';
+    osc.frequency.setValueAtTime(freq, time);
+
+    gain.gain.setValueAtTime(0.065, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+    osc.connect(gain);
+    gain.connect(this.musicFilter);
+
+    osc.start(time);
+    osc.stop(time + dur + 0.02);
+  }
+
+  /**
+   * Static radio channel sweep sound effect when switching stations.
+   */
+  _playRadioStaticZap() {
+    if (!this.ctx || !this.musicFilter) return;
+    const dur = 0.09;
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(3200, this.ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(700, this.ctx.currentTime + dur);
+    filter.Q.setValueAtTime(2.0, this.ctx.currentTime);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicFilter);
+    noise.start();
+  }
+
+  /**
+   * Sets music volume (0 to 1).
+   */
+  setMusicVolume(volume) {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    if (this.musicGain && this.ctx) {
+      const targetGain = (this.isMusicMuted || !this.isInTaxi || this.isMuted) ? 0 : this.musicVolume;
+      this.musicGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.04);
+    }
+    return this.musicVolume;
+  }
+
+  getMusicVolume() {
+    return this.musicVolume;
+  }
+
+  toggleMusicMute() {
+    this.isMusicMuted = !this.isMusicMuted;
+    if (this.musicGain && this.ctx) {
+      const targetGain = (this.isMusicMuted || !this.isInTaxi || this.isMuted) ? 0 : this.musicVolume;
+      this.musicGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.05);
+    }
+    return this.isMusicMuted;
+  }
+
+  /**
+   * Updates state when driver enters or exits the taxi.
+   * Inside taxi: full rich music plays.
+   * Outside taxi: fades to silence cleanly.
+   */
+  setInTaxiState(inTaxi) {
+    this.isInTaxi = inTaxi;
+    if (this.musicGain && this.ctx) {
+      if (inTaxi) {
+        this.musicFilter.frequency.setTargetAtTime(18000, this.ctx.currentTime, 0.3);
+        const targetGain = (this.isMusicMuted || this.isMuted) ? 0 : this.musicVolume;
+        this.musicGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.4);
+      } else {
+        this.musicGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
+      }
+    }
+  }
+
+  nextRadioStation() {
+    this.currentStationIndex = (this.currentStationIndex + 1) % this.radioStations.length;
+    this._playRadioStaticZap();
+    return this.radioStations[this.currentStationIndex];
+  }
+
+  prevRadioStation() {
+    this.currentStationIndex = (this.currentStationIndex - 1 + this.radioStations.length) % this.radioStations.length;
+    this._playRadioStaticZap();
+    return this.radioStations[this.currentStationIndex];
+  }
+
+  getCurrentStation() {
+    return this.radioStations[this.currentStationIndex];
   }
 }

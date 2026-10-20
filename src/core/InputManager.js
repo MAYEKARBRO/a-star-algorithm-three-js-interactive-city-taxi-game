@@ -42,12 +42,46 @@ export class InputManager {
       buttonSelect: false
     };
 
+    // Virtual Dual Joysticks (Left = Move, Right = Pan Camera)
+    this.virtualJoysticks = {
+      left: { x: 0, y: 0, active: false },
+      right: { x: 0, y: 0, active: false }
+    };
+
+    // Virtual Action Buttons
+    this.virtualActions = {
+      sprint: false,
+      jump: false
+    };
+
     // Event callbacks (e.g. onCameraToggle, onResetCar, onHorn, onToggleGraph)
     this.callbacks = {};
 
     this._bindKeyboardEvents();
     this._bindMouseEvents();
     this._bindGamepadEvents();
+  }
+
+  setLeftJoystick(x, y) {
+    this.virtualJoysticks.left.x = x;
+    this.virtualJoysticks.left.y = y;
+    this.virtualJoysticks.left.active = (Math.hypot(x, y) > 0.03);
+  }
+
+  setRightJoystick(x, y) {
+    this.virtualJoysticks.right.x = x;
+    this.virtualJoysticks.right.y = y;
+    this.virtualJoysticks.right.active = (Math.hypot(x, y) > 0.03);
+  }
+
+  setVirtualAction(action, isPressed) {
+    if (action in this.virtualActions) {
+      this.virtualActions[action] = !!isPressed;
+    }
+  }
+
+  triggerAction(actionName) {
+    this._trigger(actionName);
   }
 
   on(eventName, callback) {
@@ -75,6 +109,9 @@ export class InputManager {
       if (e.code === 'KeyH') this._trigger('horn');
       if (e.code === 'KeyM') this._trigger('muteToggle');
       if (e.code === 'KeyG') this._trigger('toggleGraph');
+      if (e.code === 'KeyF' || e.code === 'Enter') this._trigger('enterExitVehicle');
+      if (e.code === 'KeyE') this._trigger('interact');
+      if (e.code === 'KeyT') this._trigger('callTaxi');
       if (e.code === 'KeyI' || e.code === 'Tab') {
         e.preventDefault();
         this._trigger('toggleAStarInspector');
@@ -174,12 +211,16 @@ export class InputManager {
       return;
     }
 
-    // 1. Left Analog Stick (Steering) - Axis 0
+    // 1. Left Analog Stick (Steering & On-Foot Movement) - Axes 0 & 1
     let stickX = pad.axes[0] || 0;
     // Deadzone filter
     if (Math.abs(stickX) < 0.12) stickX = 0;
-    // Non-linear response curve for fine precision at center
     stickX = Math.sign(stickX) * Math.pow(Math.abs(stickX), 1.4);
+
+    // Axis 1: -1 is UP (front), +1 is DOWN (back)
+    let stickY = -(pad.axes[1] || 0);
+    if (Math.abs(stickY) < 0.12) stickY = 0;
+    stickY = Math.sign(stickY) * Math.pow(Math.abs(stickY), 1.4);
 
     // 2. Triggers (RT / LT for Acceleration & Brake)
     // In standard gamepad mapping: Button 7 = RT, Button 6 = LT
@@ -205,10 +246,16 @@ export class InputManager {
     let throttle = 0;
     if (btnRT > 0.05) throttle += btnRT;
     if (btnA) throttle += 1.0;
-    if (dpadUp) throttle += 1.0;
+    if (dpadUp) {
+      throttle += 1.0;
+      stickY = 1.0;
+    }
 
     if (btnLT > 0.05) throttle -= btnLT;
-    if (dpadDown) throttle -= 1.0;
+    if (dpadDown) {
+      throttle -= 1.0;
+      stickY = -1.0;
+    }
 
     const handbrake = btnRB || btnB || (btnX && throttle < 0.1);
 
@@ -233,6 +280,7 @@ export class InputManager {
 
     this.gamepadState = {
       steer: stickX,
+      stickY: stickY,
       throttle: Math.max(-1, Math.min(1, throttle)),
       handbrake,
       cameraX: rStickX,
@@ -288,12 +336,79 @@ export class InputManager {
   }
 
   /**
-   * Returns camera mouse / analog stick delta.
+   * Returns on-foot movement inputs for third-person player walking / sprinting / jumping.
+   */
+  getOnFootInput() {
+    this._pollGamepad();
+
+    let moveX = 0; // A/D or Left Stick X
+    let moveZ = 0; // W/S or Left Stick Y
+
+    // 1. Keyboard
+    if (this.keys['KeyW'] || this.keys['ArrowUp']) moveZ += 1;
+    if (this.keys['KeyS'] || this.keys['ArrowDown']) moveZ -= 1;
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveX -= 1;
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) moveX += 1;
+
+    // 2. Virtual Left Joystick (Move Character)
+    if (this.virtualJoysticks.left.active) {
+      moveX += this.virtualJoysticks.left.x;
+      moveZ += this.virtualJoysticks.left.y;
+    }
+
+    // 3. Gamepad Left Stick
+    if (this.gamepadConnected) {
+      if (Math.abs(this.gamepadState.steer) > 0.15) {
+        moveX += this.gamepadState.steer;
+      }
+      if (this.gamepadState.stickY !== undefined && Math.abs(this.gamepadState.stickY) > 0.15) {
+        moveZ += this.gamepadState.stickY;
+      } else if (Math.abs(this.gamepadState.throttle) > 0.15) {
+        moveZ += this.gamepadState.throttle;
+      }
+    }
+
+    // Clamp analog magnitude to 1.0 max
+    const mag = Math.hypot(moveX, moveZ);
+    if (mag > 1.0) {
+      moveX /= mag;
+      moveZ /= mag;
+    }
+
+    const sprint = !!(
+      this.keys['ShiftLeft'] ||
+      this.keys['ShiftRight'] ||
+      this.virtualActions.sprint ||
+      (this.gamepadConnected && this.gamepadState.buttonA)
+    );
+
+    const jump = !!(
+      this.keys['Space'] ||
+      this.virtualActions.jump ||
+      (this.gamepadConnected && this.gamepadState.buttonRB)
+    );
+
+    return {
+      moveX,
+      moveZ,
+      sprint,
+      jump
+    };
+  }
+
+  /**
+   * Returns camera mouse / analog stick / virtual joystick pan delta.
    */
   getCameraInput() {
-    const deltaX = this.mouse.deltaX * 0.008 + this.gamepadState.cameraX * 0.05;
-    const deltaY = this.mouse.deltaY * 0.008 + this.gamepadState.cameraY * 0.05;
+    let deltaX = this.mouse.deltaX * 0.008 + this.gamepadState.cameraX * 0.05;
+    let deltaY = this.mouse.deltaY * 0.008 + this.gamepadState.cameraY * 0.05;
     const zoom = this.mouse.zoomDelta;
+
+    // Virtual Right Joystick (Pan Around Camera)
+    if (this.virtualJoysticks.right.active) {
+      deltaX += this.virtualJoysticks.right.x * 0.05;
+      deltaY += this.virtualJoysticks.right.y * 0.035;
+    }
 
     // Reset mouse deltas after consuming
     this.mouse.deltaX = 0;

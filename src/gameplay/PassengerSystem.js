@@ -25,8 +25,8 @@ export class PassengerSystem {
     // Active A* navigation data
     this.activeAStarResult = null;
 
-    // Financials & Progression
-    this.totalEarnings = 0;
+    // Financials & Progression (Starts with $150.00 pocket money for food and tuning)
+    this.totalEarnings = 150.0;
     this.completedTrips = 0;
     this.currentTripDistance = 0;
     this.tripTimeElapsed = 0;
@@ -300,11 +300,24 @@ export class PassengerSystem {
   }
 
   /**
-   * Deducts a cash fine (e.g. hitting a pedestrian or busted by police).
+   * Deducts a cash fine (e.g. hitting a pedestrian or running red light).
    * @param {number} amount
    */
   deductFine(amount) {
     this.totalEarnings = Math.max(0, this.totalEarnings - amount);
     return this.totalEarnings;
+  }
+
+  /**
+   * Spends cash on purchases (e.g. food stalls, safehouse upgrades).
+   * @param {number} amount
+   * @returns {boolean} true if successful, false if insufficient funds
+   */
+  spendMoney(amount) {
+    if (this.totalEarnings >= amount) {
+      this.totalEarnings -= amount;
+      return true;
+    }
+    return false;
   }
 }
